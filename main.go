@@ -1,0 +1,182 @@
+// Command jenkins-mcp is a local MCP server that exposes a small Jenkins
+// REST surface over stdio.
+//
+// Configuration is read from environment variables at startup:
+//
+//	JENKINS_URL        Base URL of the Jenkins instance (no trailing slash).
+//	JENKINS_USER       Username for HTTP Basic auth.
+//	JENKINS_API_TOKEN  API token for HTTP Basic auth.
+//
+// Optional:
+//
+//	JENKINS_MCP_CACHE_DIR  Directory for cached console logs of finished
+//	                       builds. Defaults to $XDG_CACHE_HOME/jenkins-mcp,
+//	                       or ~/.cache/jenkins-mcp.
+//	JENKINS_MCP_CACHE_MAX  Soft cap on cache size in bytes. Defaults to 1 GiB.
+//	JENKINS_MCP_TIMEOUT    HTTP timeout (Go duration). Defaults to 90s.
+//
+// All network access is limited to JENKINS_URL. The server speaks MCP over
+// stdio and is intended to be launched by an MCP-aware client.
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"strconv"
+	"time"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/2001adarsh/jenkins-mcp-go/internal/jenkins"
+	"github.com/2001adarsh/jenkins-mcp-go/internal/tools"
+)
+
+// version is set at link time by -ldflags; defaults to "dev" for local builds.
+var version = "dev"
+
+func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	client, err := jenkins.NewClient(jenkins.Config{
+		BaseURL: cfg.URL,
+		User:    cfg.User,
+		Token:   cfg.Token,
+		Timeout: cfg.Timeout,
+	})
+	if err != nil {
+		return err
+	}
+
+	cache, err := jenkins.NewConsoleCache(client, cfg.CacheDir)
+	if err != nil {
+		return err
+	}
+	if cfg.CacheMax > 0 {
+		cache.MaxBytes = cfg.CacheMax
+	}
+
+	deps := tools.Deps{Client: client, Cache: cache}
+
+	srv := mcp.NewServer(&mcp.Implementation{
+		Name:    "jenkins",
+		Version: version,
+	}, nil)
+
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "get_console_log",
+		Description: "Fetch Jenkins build console output. Returns last 500 lines by default; " +
+			"pass tail_lines explicitly (negative = full log). The response footer reports the " +
+			"on-disk cache path so the full log can be inspected via Read/Grep/Bash without re-fetching.",
+	}, deps.GetConsoleLog)
+
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "get_console_log_path",
+		Description: "Download (if needed) the full console log for a completed build and return " +
+			"its on-disk cache path. Lets you Read/Grep/Bash the full log natively — useful when " +
+			"one test's failure is caused by an earlier test, and you need to see everything that came before.",
+	}, deps.GetConsoleLogPath)
+
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "get_build_info",
+		Description: "Get a Jenkins build's status, duration, parameters, and change set.",
+	}, deps.GetBuildInfo)
+
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "search_console_log",
+		Description: "Regex-search (RE2) a Jenkins build's console log and return matches with surrounding context.",
+	}, deps.SearchConsoleLog)
+
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "get_failure_summary",
+		Description: "Parse a Ginkgo `Summarizing N Failure` block from the build's console log " +
+			"and, for each failing spec, return the first [ERROR] line tagged with that spec name " +
+			"plus surrounding context. Ginkgo-specific — returns a hint if the log doesn't look like Ginkgo.",
+	}, deps.GetFailureSummary)
+
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "get_test_report",
+		Description: "Fetch structured JUnit test results from Jenkins' /testReport/api/json. " +
+			"Returns failed cases with className, name, duration, errorDetails, and head+tail of " +
+			"the stack trace. Returns a hint if the build has no JUnit publisher (HTTP 404).",
+	}, deps.GetTestReport)
+
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "get_pipeline_stages",
+		Description: "List Declarative/Scripted Pipeline stages for a build with status and " +
+			"duration via /wfapi/describe. Use this first to find which stage failed before " +
+			"grabbing the full log.",
+	}, deps.GetPipelineStages)
+
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "get_stage_log",
+		Description: "Fetch a single pipeline stage's log via /execution/node/<id>/wfapi/log. " +
+			"Many declarative wrapper stages have empty stage logs — fall back to " +
+			"get_console_log_path when this returns length=0.",
+	}, deps.GetStageLog)
+
+	return srv.Run(context.Background(), &mcp.StdioTransport{})
+}
+
+type config struct {
+	URL      string
+	User     string
+	Token    string
+	CacheDir string
+	CacheMax int64
+	Timeout  time.Duration
+}
+
+func loadConfig() (config, error) {
+	var cfg config
+	cfg.URL = os.Getenv("JENKINS_URL")
+	cfg.User = os.Getenv("JENKINS_USER")
+	cfg.Token = os.Getenv("JENKINS_API_TOKEN")
+	if cfg.URL == "" || cfg.User == "" || cfg.Token == "" {
+		return cfg, fmt.Errorf("JENKINS_URL, JENKINS_USER, and JENKINS_API_TOKEN must all be set")
+	}
+
+	dir := os.Getenv("JENKINS_MCP_CACHE_DIR")
+	if dir == "" {
+		dir = defaultCacheDir()
+	}
+	cfg.CacheDir = dir
+
+	if v := os.Getenv("JENKINS_MCP_CACHE_MAX"); v != "" {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || n <= 0 {
+			return cfg, fmt.Errorf("JENKINS_MCP_CACHE_MAX must be a positive integer, got %q", v)
+		}
+		cfg.CacheMax = n
+	}
+
+	if v := os.Getenv("JENKINS_MCP_TIMEOUT"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 {
+			return cfg, fmt.Errorf("JENKINS_MCP_TIMEOUT must be a positive Go duration, got %q", v)
+		}
+		cfg.Timeout = d
+	}
+
+	return cfg, nil
+}
+
+// defaultCacheDir returns $XDG_CACHE_HOME/jenkins-mcp (or ~/.cache/jenkins-mcp).
+// Falls back to a temp dir if the user's cache dir cannot be resolved.
+func defaultCacheDir() string {
+	if dir, err := os.UserCacheDir(); err == nil {
+		return filepath.Join(dir, "jenkins-mcp")
+	}
+	return filepath.Join(os.TempDir(), "jenkins-mcp")
+}

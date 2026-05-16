@@ -1,0 +1,29 @@
+# Build artifacts
+/bin/
+/dist/
+jenkins-mcp
+*.exe
+*.test
+*.out
+vendor/
+
+# Go workspace files
+go.work
+go.work.sum
+
+# Coverage
+coverage.out
+coverage.html
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local Claude Code config (per-user, not committed)
+.claude/
