@@ -14,6 +14,11 @@
 //	                       or ~/.cache/jenkins-mcp.
 //	JENKINS_MCP_CACHE_MAX  Soft cap on cache size in bytes. Defaults to 1 GiB.
 //	JENKINS_MCP_TIMEOUT    HTTP timeout (Go duration). Defaults to 90s.
+//	JENKINS_MCP_DEBUG      When set to any non-empty value, emit one stderr
+//	                       line per outbound Jenkins request and per cache
+//	                       hit/write/eviction. Never writes credentials,
+//	                       request headers, or response bodies. See
+//	                       docs/DEBUGGING.md.
 //
 // All network access is limited to JENKINS_URL. The server speaks MCP over
 // stdio and is intended to be launched by an MCP-aware client.

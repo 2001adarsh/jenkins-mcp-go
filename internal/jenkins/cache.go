@@ -75,8 +75,10 @@ func (cc *ConsoleCache) Fetch(ctx context.Context, jobPath string, buildNumber i
 		if b, e := os.ReadFile(cachePath); e == nil {
 			now := time.Now()
 			_ = os.Chtimes(cachePath, now, now)
+			debugf("cache hit  %s (%d bytes)", cachePath, len(b))
 			return b, cachePath, nil
 		}
+		debugf("cache miss %s", cachePath)
 		cachePath = ""
 	}
 
@@ -92,8 +94,13 @@ func (cc *ConsoleCache) Fetch(ctx context.Context, jobPath string, buildNumber i
 		defer cc.mu.Unlock()
 		if writeErr := os.WriteFile(path, body, 0o644); writeErr == nil {
 			cachePath = path
+			debugf("cache write %s (%d bytes)", path, len(body))
 			cc.evictIfOverCap()
+		} else {
+			debugf("cache write failed %s: %v", path, writeErr)
 		}
+	} else if buildNumber > 0 {
+		debugf("cache skip %s (build not finished)", cc.Path(jobPath, buildNumber))
 	}
 	return body, cachePath, nil
 }
@@ -127,13 +134,21 @@ func (cc *ConsoleCache) evictIfOverCap() {
 		return
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].mtime.Before(items[j].mtime) })
+	startTotal := total
+	evicted := 0
 	for _, it := range items {
 		if total <= cc.MaxBytes {
-			return
+			break
 		}
 		if err := os.Remove(it.path); err == nil {
+			debugf("cache evict %s (%d bytes, mtime %s)", it.path, it.size, it.mtime.Format(time.RFC3339))
 			total -= it.size
+			evicted++
 		}
+	}
+	if evicted > 0 {
+		debugf("cache eviction freed %d bytes across %d files (%d → %d, cap %d)",
+			startTotal-total, evicted, startTotal, total, cc.MaxBytes)
 	}
 }
 

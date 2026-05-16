@@ -6,13 +6,30 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
 
 // DefaultTimeout is the HTTP timeout used when Config.Timeout is zero.
 const DefaultTimeout = 90 * time.Second
+
+// debugEnabled is sampled once at process start. When set, debugf emits a
+// single stderr line for each outbound Jenkins request, cache hit, and cache
+// write. Stderr only — stdout is reserved for MCP protocol frames.
+var debugEnabled = os.Getenv("JENKINS_MCP_DEBUG") != ""
+
+// debugf prints a single stderr line when JENKINS_MCP_DEBUG is set. Callers
+// must never pass response bodies or request headers — the Authorization
+// header carries the Jenkins API token, and bodies can be megabytes.
+func debugf(format string, args ...any) {
+	if !debugEnabled {
+		return
+	}
+	log.Printf("jenkins: "+format, args...)
+}
 
 // Client is a Jenkins REST client with HTTP Basic auth.
 //
@@ -69,15 +86,20 @@ func (c *Client) Get(ctx context.Context, path string, query map[string]string) 
 		req.URL.RawQuery = q.Encode()
 	}
 	req.SetBasicAuth(c.user, c.token)
+	debugf("req  GET %s", req.URL.Path)
+	start := time.Now()
 	resp, err := c.http.Do(req)
 	if err != nil {
+		debugf("err  GET %s after %s: %v", req.URL.Path, time.Since(start), err)
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		debugf("err  GET %s read body after %s: %v", req.URL.Path, time.Since(start), err)
 		return nil, err
 	}
+	debugf("resp %d GET %s in %s (%d bytes)", resp.StatusCode, req.URL.Path, time.Since(start), len(body))
 	if resp.StatusCode/100 != 2 {
 		snippet := string(body)
 		if len(snippet) > 300 {

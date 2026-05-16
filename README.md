@@ -100,6 +100,7 @@ and no command-line flags — keep credentials out of process arguments.
 | `JENKINS_MCP_CACHE_DIR` | no | `$XDG_CACHE_HOME/jenkins-mcp` (or `~/.cache/jenkins-mcp`) | Where finished build logs are cached on disk. |
 | `JENKINS_MCP_CACHE_MAX` | no | `1073741824` (1 GiB) | Soft cap on cache size in bytes. Evicts oldest-mtime files first. |
 | `JENKINS_MCP_TIMEOUT` | no | `90s` | HTTP timeout (Go duration: `30s`, `2m`, etc.). |
+| `JENKINS_MCP_DEBUG` | no | unset | When set to any non-empty value, emits one stderr line per outbound Jenkins request and cache event. See [`docs/DEBUGGING.md`](docs/DEBUGGING.md). |
 
 > **Note** — `JENKINS_API_TOKEN` should be a Jenkins **API token**, not your
 > account password. In Jenkins, navigate to your user menu → **Configure** →
@@ -241,7 +242,8 @@ make clean
 
 Open a topic branch off `main`, keep commits focused, and run `make test lint`
 before opening a PR. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full
-contributor guide.
+contributor guide and [`docs/DEBUGGING.md`](docs/DEBUGGING.md) for how to
+exercise the server locally with MCP Inspector.
 
 ## Compatibility
 
