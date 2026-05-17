@@ -124,7 +124,7 @@ func (c *Client) Get(ctx context.Context, path string, query map[string]string) 
 // errors. Use PostWithStatus for endpoints with quirky success semantics
 // (e.g. /queue/cancelItem returns 404 on success).
 func (c *Client) Post(ctx context.Context, path string, query map[string]string, form url.Values) ([]byte, error) {
-	body, status, err := c.doPost(ctx, path, query, form)
+	body, status, _, err := c.doPost(ctx, path, query, form)
 	if err != nil {
 		return nil, err
 	}
@@ -142,17 +142,25 @@ func (c *Client) Post(ctx context.Context, path string, query map[string]string,
 // without erroring on non-2xx. The returned error is only set for
 // transport-level failures.
 func (c *Client) PostWithStatus(ctx context.Context, path string, query map[string]string, form url.Values) ([]byte, int, error) {
+	body, status, _, err := c.doPost(ctx, path, query, form)
+	return body, status, err
+}
+
+// PostWithLocation is like PostWithStatus but also returns the response
+// Location header — Jenkins sets it on /build and /buildWithParameters
+// responses (201 Created) to point at the resulting /queue/item/<id>/.
+func (c *Client) PostWithLocation(ctx context.Context, path string, query map[string]string, form url.Values) ([]byte, int, string, error) {
 	return c.doPost(ctx, path, query, form)
 }
 
-func (c *Client) doPost(ctx context.Context, path string, query map[string]string, form url.Values) ([]byte, int, error) {
+func (c *Client) doPost(ctx context.Context, path string, query map[string]string, form url.Values) ([]byte, int, string, error) {
 	var bodyReader io.Reader
 	if form != nil {
 		bodyReader = strings.NewReader(form.Encode())
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bodyReader)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "", err
 	}
 	if len(query) > 0 {
 		q := req.URL.Query()
@@ -166,7 +174,7 @@ func (c *Client) doPost(ctx context.Context, path string, query map[string]strin
 	}
 	req.SetBasicAuth(c.user, c.token)
 	if header, value, err := c.crumb(ctx); err != nil {
-		return nil, 0, err
+		return nil, 0, "", err
 	} else if header != "" {
 		req.Header.Set(header, value)
 	}
@@ -175,16 +183,16 @@ func (c *Client) doPost(ctx context.Context, path string, query map[string]strin
 	resp, err := c.http.Do(req)
 	if err != nil {
 		debugf("err  POST %s after %s: %v", req.URL.Path, time.Since(start), err)
-		return nil, 0, err
+		return nil, 0, "", err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		debugf("err  POST %s read body after %s: %v", req.URL.Path, time.Since(start), err)
-		return nil, 0, err
+		return nil, 0, "", err
 	}
 	debugf("resp %d POST %s in %s (%d bytes)", resp.StatusCode, req.URL.Path, time.Since(start), len(body))
-	return body, resp.StatusCode, nil
+	return body, resp.StatusCode, resp.Header.Get("Location"), nil
 }
 
 // crumb fetches and caches the CSRF crumb. Empty header means the crumb
