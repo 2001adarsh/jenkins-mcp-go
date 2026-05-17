@@ -1,7 +1,8 @@
 # Tool reference
 
-All tools take a `job_path` and a `build_number`. The path is slash-separated;
-folder boundaries are converted to Jenkins' nested `/job/...` form internally.
+Build-targeted tools take a `job_path` and a `build_number`. The path is
+slash-separated; folder boundaries are converted to Jenkins' nested
+`/job/...` form internally.
 
 A URL like
 
@@ -15,9 +16,31 @@ becomes
 { "job_path": "Builds/team/job-name", "build_number": 86 }
 ```
 
-`build_number: 0` (or omitted) resolves to `lastBuild`.
+`build_number: 0` (or omitted) resolves to `lastBuild`. `list_jobs` is the
+discovery tool — it takes a `folder_path` in the same slash-separated form
+(empty = root).
 
 ---
+
+## `list_jobs`
+
+Enumerate jobs and folders under `folder_path` (root when empty). Use this
+when the caller doesn't already know a `job_path`.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `folder_path` | string | no | `""` | Slash-separated folder path (e.g. `team/integration`). Empty = Jenkins root. |
+| `recursive` | bool | no | `false` | Walk into sub-folders (Folder, OrganizationFolder, WorkflowMultiBranchProject). |
+| `name_filter` | string | no | — | Case-insensitive RE2 regex matched against each job's leaf name. A plain substring works too. |
+
+Output is a compact table of `type`, `status` (Jenkins `color`), last build
+number/result, `job_path`, and the entry's `url`. Folders are always
+traversed when `recursive=true` regardless of whether their own name
+matches `name_filter` — matching jobs may live inside them.
+
+The response is capped at **500 entries**. If the cap is hit, the output
+ends with a hint to narrow with `folder_path` or `name_filter` (Jenkins'
+`/api/json` does not paginate).
 
 ## `get_console_log`
 
