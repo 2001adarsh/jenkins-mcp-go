@@ -5,9 +5,10 @@
 
 **A focused, fast Model Context Protocol (MCP) server for Jenkins, written in Go.**
 
-Give your LLM agent eyes (and hands, opt-out) into Jenkins: fetch console logs,
-inspect pipeline stages, parse JUnit reports, zero in on Ginkgo failures, and
-manage the build queue — all over a single MCP stdio transport.
+Connect Jenkins to Claude Desktop, Claude Code, Cursor, or any MCP-compatible
+AI agent: fetch console logs, inspect pipeline stages, parse JUnit and Ginkgo
+test reports, trigger and abort builds, and manage the build queue — all over
+a single MCP stdio transport, from one static Go binary.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/2001adarsh/jenkins-mcp-go.svg)](https://pkg.go.dev/github.com/2001adarsh/jenkins-mcp-go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/2001adarsh/jenkins-mcp-go)](https://goreportcard.com/report/github.com/2001adarsh/jenkins-mcp-go)
@@ -29,8 +30,9 @@ console log without re-downloading it on every question.
 **jenkins-mcp-go** is built for that workflow:
 
 - **Read-first, opt-out writes.** Read tools are always on. Write tools
-  (e.g. `cancel_queue_item`) are gated by `JENKINS_MCP_READONLY`: set the
-  env var and the server registers only the read surface.
+  (`trigger_build`, `stop_build`, `cancel_queue_item`) are gated by
+  `JENKINS_MCP_READONLY`: set the env var and the server registers only
+  the read surface.
 - **Single-host, single-credential.** It talks to one Jenkins URL with one
   API token, configured by environment variables. No multi-tenant surface,
   no credential vault to misuse.
@@ -270,6 +272,70 @@ exercise the server locally with MCP Inspector.
   `/consoleText`, `/wfapi/describe`, `/testReport/api/json` endpoints.
   Pipeline-specific tools require the Pipeline plugin.
 - **MCP:** uses [`github.com/modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk) v1.6+.
+
+## Alternatives
+
+How `jenkins-mcp-go` compares to other ways of exposing Jenkins to an LLM:
+
+| Option | Runtime | Read-only mode | Console-log cache | Pipeline / JUnit / Ginkgo tools |
+| --- | --- | --- | --- | --- |
+| **`jenkins-mcp-go`** (this repo) | Single static Go binary | Yes, gated by `JENKINS_MCP_READONLY` | LRU disk cache for finished builds | First-class, pre-digested responses |
+| Python-based Jenkins MCP servers | Python interpreter + deps | Varies by project | Typically none — re-fetches each call | Usually raw `/api/json` pass-through |
+| Generic HTTP-to-MCP gateways | Node / Python runtime | Whatever the gateway enforces | None | None — agent has to parse raw JSON |
+| Direct `curl` / shell tools from the agent | Shell | Manual | None | None — agent reasons over raw text |
+
+If you want a small, predictable surface tailored to "the agent is debugging a
+Jenkins build", this project is for you. If you need a generic JSON proxy or
+multi-tenant credential routing, a generic HTTP-MCP gateway is a better fit.
+
+## FAQ
+
+### How do I connect Jenkins to Claude?
+
+Install the `jenkins-mcp` binary, then add it to your Claude Desktop or
+Claude Code MCP configuration with your `JENKINS_URL`, `JENKINS_USER`, and
+`JENKINS_API_TOKEN`. See [MCP client setup](#mcp-client-setup) above for the
+exact JSON / CLI snippets.
+
+### Does this work with Cursor, Continue, or Windsurf?
+
+Yes. Any MCP client that supports stdio servers will accept the same
+`command` + `env` configuration shown in the [MCP client setup](#mcp-client-setup)
+section.
+
+### Is the server read-only?
+
+Reads are always on. Write tools (`trigger_build`, `stop_build`,
+`cancel_queue_item`) are registered by default but can be suppressed entirely
+by setting `JENKINS_MCP_READONLY=1` — the server then never registers a
+mutating tool, so an agent literally cannot call one.
+
+### Do I need a Jenkins plugin to use this?
+
+No extra plugin is required for the core read tools — they hit standard
+Jenkins endpoints. Pipeline-specific tools (`get_pipeline_stages`,
+`get_stage_log`) require the Pipeline plugin, which most Jenkins installations
+already have.
+
+### Can the LLM agent grep through a multi-gigabyte console log?
+
+Yes. Use `get_console_log_path` to force-cache the full log for a finished
+build to disk; the tool returns a local path the agent can then `Read`,
+`Grep`, or `Bash` natively. The cache is LRU-evicted and capped by
+`JENKINS_MCP_CACHE_MAX`.
+
+### Does it handle Ginkgo test failures specifically?
+
+Yes. `get_failure_summary` parses Ginkgo's `Summarizing N Failure` block and
+surfaces the first `[ERROR]` line tagged with each spec name plus surrounding
+context — much faster than asking the agent to scan the whole log.
+
+### Is it safe to give an LLM API token access to Jenkins?
+
+The server uses a single Jenkins user's API token (not a password), confined
+to one `JENKINS_URL`. Combine with `JENKINS_MCP_READONLY=1` and a least-privilege
+Jenkins user for the safest default. See [SECURITY.md](SECURITY.md) for the
+full threat model.
 
 ## License
 

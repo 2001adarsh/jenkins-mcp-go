@@ -1,0 +1,67 @@
+name: Bug report
+description: Report a defect in jenkins-mcp-go
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please fill in the sections
+        below — a clear repro and a server stderr snippet make this **much**
+        faster to triage.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect to happen?
+      placeholder: "`get_console_log` returned 404 instead of the build log when..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      description: Minimal steps. Include the tool call (name + arguments) when relevant.
+      placeholder: |
+        1. Set JENKINS_URL / JENKINS_USER / JENKINS_API_TOKEN.
+        2. Call `get_console_log` with `{"job_path": "team/foo", "build_number": 42}`.
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: stderr
+    attributes:
+      label: Server stderr (with `JENKINS_MCP_DEBUG=1`)
+      description: |
+        Re-run with `JENKINS_MCP_DEBUG=1` and paste the relevant stderr lines.
+        Redact hostnames / tokens if necessary.
+      render: text
+
+  - type: input
+    id: version
+    attributes:
+      label: jenkins-mcp-go version
+      placeholder: "v0.x.y or commit SHA"
+    validations:
+      required: true
+
+  - type: input
+    id: jenkins-version
+    attributes:
+      label: Jenkins version
+      placeholder: "e.g. 2.452.3 LTS"
+
+  - type: input
+    id: client
+    attributes:
+      label: MCP client
+      placeholder: "Claude Desktop / Claude Code / Cursor / MCP Inspector / ..."
+
+  - type: input
+    id: os
+    attributes:
+      label: OS / architecture
+      placeholder: "macOS 14 arm64 / Ubuntu 22.04 amd64 / ..."
