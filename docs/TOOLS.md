@@ -146,3 +146,22 @@ context.
 
 Ginkgo-specific. Returns a hint when the log doesn't look like Ginkgo (no
 summary block found).
+
+## `list_nodes`
+
+List all Jenkins agents/nodes via `/computer/api/json`. Returns a compact
+table of name, status (`online`/`offline`/`temp-off`), executor count, idle
+flag, and labels, plus a per-node offline-cause section when any agent is
+offline with a reason. Use this to diagnose "why is this build still queued"
+— typically the matching agents are all offline.
+
+No inputs.
+
+## `get_node`
+
+Single-node detail via `/computer/<name>/api/json`. Adds per-executor idle
+state and the full monitor data map on top of the listing fields.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `name` | string | yes | — | Node name. Use `"(built-in)"` or `"(master)"` for the controller depending on Jenkins version. URL-encoding is handled internally. |
