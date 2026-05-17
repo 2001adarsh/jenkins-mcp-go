@@ -162,6 +162,19 @@ func run() error {
 			"monitor data. Use \"(built-in)\" or \"(master)\" for the controller depending on Jenkins version.",
 	}, deps.GetNode)
 
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "list_queue",
+		Description: "List pending Jenkins queue items with the block reason for each — useful for " +
+			"diagnosing 'why hasn't this build started yet'. Optional job_path_prefix narrows the " +
+			"listing to items whose task URL contains the substring.",
+	}, deps.ListQueue)
+
+	addWriteTool(srv, cfg, &mcp.Tool{
+		Name: "cancel_queue_item",
+		Description: "Drop a pending Jenkins queue item by id before it starts. Mutates Jenkins state. " +
+			"Returns a clear 'already left queue' message when the item has already been built or cancelled.",
+	}, deps.CancelQueueItem)
+
 	return srv.Run(context.Background(), &mcp.StdioTransport{})
 }
 
