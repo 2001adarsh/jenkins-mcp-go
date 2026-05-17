@@ -46,6 +46,7 @@ console log without re-downloading it on every question.
 
 | Tool | Purpose |
 | --- | --- |
+| `list_jobs` | Enumerate jobs and folders under a path (or root). Optional recursion and case-insensitive RE2 name filter; capped at 500 entries. |
 | `get_console_log` | Tail the build's `/consoleText`. Defaults to last 500 lines; pass `tail_lines: -1` for the full log. |
 | `get_console_log_path` | Force-cache the full log for a completed build and return its on-disk path so the agent can `Read`/`Grep`/`Bash` it natively. |
 | `search_console_log` | RE2 regex search over the console log with line-number-aware context windows. |
@@ -55,10 +56,12 @@ console log without re-downloading it on every question.
 | `get_test_report` | Structured JUnit results from `/testReport/api/json`, with failed cases and head+tail of stack traces. |
 | `get_failure_summary` | Parse Ginkgo's `Summarizing N Failure` block and surface the first `[ERROR]` tagged with each spec name. |
 
-All tools take a `job_path` (slash-separated, e.g. `Builds/team/job-name`) and
-an optional `build_number` (`0` or omitted = `lastBuild`). A URL like
+Build-targeted tools take a `job_path` (slash-separated, e.g.
+`Builds/team/job-name`) and an optional `build_number` (`0` or omitted =
+`lastBuild`). A URL like
 `https://jenkins.example.com/job/Builds/job/team/job/job-name/86/` becomes
-`job_path="Builds/team/job-name"`, `build_number=86`.
+`job_path="Builds/team/job-name"`, `build_number=86`. `list_jobs` takes a
+`folder_path` in the same slash-separated form (empty = root).
 
 See [`docs/TOOLS.md`](docs/TOOLS.md) for the full parameter reference.
 
@@ -167,6 +170,9 @@ form:
 
 Once the server is registered, ask your agent things like:
 
+- *"What integration-test jobs do we have under `Builds/team`?"*
+  → calls `list_jobs` with `folder_path: "Builds/team"`, `recursive: true`,
+  `name_filter: "integration"`.
 - *"What was the result of build 86 of `Builds/team/integration-tests`?"*
   → calls `get_build_info`.
 - *"Show me the last 200 lines of the most recent run of `nightly`."*
@@ -205,6 +211,7 @@ internal/jenkins/
 
 internal/tools/
 ├─ common.go                    Deps struct, shared response helpers
+├─ jobs.go                      list_jobs
 ├─ console.go                   get_console_log, get_console_log_path, search_console_log
 ├─ build.go                     get_build_info
 ├─ pipeline.go                  get_pipeline_stages, get_stage_log

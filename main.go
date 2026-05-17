@@ -80,6 +80,14 @@ func run() error {
 	}, nil)
 
 	mcp.AddTool(srv, &mcp.Tool{
+		Name: "list_jobs",
+		Description: "Enumerate jobs and folders in Jenkins. Pass folder_path to scope the listing " +
+			"(empty = root), recursive=true to walk into sub-folders, and name_filter (case-insensitive " +
+			"RE2 regex) to match leaf names. Use this first when the caller doesn't already know a job_path. " +
+			"Capped at 500 entries — narrow with folder_path or name_filter for large instances.",
+	}, deps.ListJobs)
+
+	mcp.AddTool(srv, &mcp.Tool{
 		Name: "get_console_log",
 		Description: "Fetch Jenkins build console output. Returns last 500 lines by default; " +
 			"pass tail_lines explicitly (negative = full log). The response footer reports the " +
