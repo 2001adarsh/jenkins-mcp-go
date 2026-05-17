@@ -55,6 +55,8 @@ console log without re-downloading it on every question.
 | `get_stage_log` | Fetch a single pipeline stage's log via `/execution/node/<id>/wfapi/log`. |
 | `get_test_report` | Structured JUnit results from `/testReport/api/json`, with failed cases and head+tail of stack traces. |
 | `get_failure_summary` | Parse Ginkgo's `Summarizing N Failure` block and surface the first `[ERROR]` tagged with each spec name. |
+| `list_nodes` | List Jenkins agents/nodes with status, executor counts, labels, and monitor summaries. |
+| `get_node` | Per-node detail: status, per-executor idle state, labels, full monitor data. |
 
 Build-targeted tools take a `job_path` (slash-separated, e.g.
 `Builds/team/job-name`) and an optional `build_number` (`0` or omitted =
@@ -217,7 +219,8 @@ internal/tools/
 ├─ build.go                     get_build_info
 ├─ pipeline.go                  get_pipeline_stages, get_stage_log
 ├─ tests.go                     get_test_report
-└─ failures.go                  get_failure_summary (Ginkgo)
+├─ failures.go                  get_failure_summary (Ginkgo)
+└─ nodes.go                     list_nodes, get_node
 ```
 
 `internal/` is intentionally not importable by external modules; the public

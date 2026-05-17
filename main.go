@@ -149,6 +149,19 @@ func run() error {
 			"get_console_log_path when this returns length=0.",
 	}, deps.GetStageLog)
 
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "list_nodes",
+		Description: "List all Jenkins agents/nodes with online/offline status, executor counts, " +
+			"labels, and monitor summaries. Use this to diagnose 'why is this build still queued' — " +
+			"often the matching agents are all offline.",
+	}, deps.ListNodes)
+
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "get_node",
+		Description: "Get a single Jenkins node's status, per-executor idle state, labels, and full " +
+			"monitor data. Use \"(built-in)\" or \"(master)\" for the controller depending on Jenkins version.",
+	}, deps.GetNode)
+
 	return srv.Run(context.Background(), &mcp.StdioTransport{})
 }
 
