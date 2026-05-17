@@ -94,7 +94,7 @@ func TestCancelQueueItem_Success404(t *testing.T) {
 		t.Fatalf("CancelQueueItem: %v", err)
 	}
 	out := resultText(t, res)
-	if !strings.Contains(out, "Cancelled queue item 42") {
+	if !strings.Contains(out, "Canceled queue item 42") {
 		t.Errorf("expected cancellation acknowledgement, got:\n%s", out)
 	}
 	r := last()

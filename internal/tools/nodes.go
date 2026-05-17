@@ -31,15 +31,15 @@ type apiExecutor struct {
 }
 
 type apiComputer struct {
-	DisplayName         string         `json:"displayName"`
-	Offline             bool           `json:"offline"`
-	TemporarilyOffline  bool           `json:"temporarilyOffline"`
-	OfflineCauseReason  string         `json:"offlineCauseReason"`
-	NumExecutors        int            `json:"numExecutors"`
-	Idle                bool           `json:"idle"`
-	AssignedLabels      []apiLabel     `json:"assignedLabels"`
-	MonitorData         map[string]any `json:"monitorData"`
-	Executors           []apiExecutor  `json:"executors"`
+	DisplayName        string         `json:"displayName"`
+	Offline            bool           `json:"offline"`
+	TemporarilyOffline bool           `json:"temporarilyOffline"`
+	OfflineCauseReason string         `json:"offlineCauseReason"`
+	NumExecutors       int            `json:"numExecutors"`
+	Idle               bool           `json:"idle"`
+	AssignedLabels     []apiLabel     `json:"assignedLabels"`
+	MonitorData        map[string]any `json:"monitorData"`
+	Executors          []apiExecutor  `json:"executors"`
 }
 
 type apiComputerListing struct {

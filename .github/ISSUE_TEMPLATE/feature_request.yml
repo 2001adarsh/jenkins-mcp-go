@@ -1,0 +1,41 @@
+name: Feature request
+description: Propose a new tool, parameter, or behavior
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Small scope is this project's most important design constraint. Please
+        describe the use case first — it's easier to agree on whether a feature
+        belongs before any code is written.
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: What is the agent trying to do, and where does the current toolset fall short?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: |
+        Sketch of the new tool / parameter. Include the tool name, inputs,
+        and what the response would look like.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing tools or workarounds you tried, and why they didn't fit.
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This is a read-only operation, or a write op that respects `JENKINS_MCP_READONLY`.
+        - label: This targets the single configured `JENKINS_URL` (no per-tool host argument).

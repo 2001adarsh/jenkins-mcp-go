@@ -172,7 +172,7 @@ func run() error {
 	addWriteTool(srv, cfg, &mcp.Tool{
 		Name: "cancel_queue_item",
 		Description: "Drop a pending Jenkins queue item by id before it starts. Mutates Jenkins state. " +
-			"Returns a clear 'already left queue' message when the item has already been built or cancelled.",
+			"Returns a clear 'already left queue' message when the item has already been built or canceled.",
 	}, deps.CancelQueueItem)
 
 	addWriteTool(srv, cfg, &mcp.Tool{
