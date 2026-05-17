@@ -165,3 +165,25 @@ state and the full monitor data map on top of the listing fields.
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | `name` | string | yes | — | Node name. Use `"(built-in)"` or `"(master)"` for the controller depending on Jenkins version. URL-encoding is handled internally. |
+
+## `list_queue`
+
+List pending Jenkins queue items via `/queue/api/json`. Each entry shows the
+queued task, how long it has waited, state flags (`buildable`, `blocked`,
+`stuck`), and the Jenkins "why" reason — the most useful field for
+diagnosing "why hasn't this build started yet".
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `job_path_prefix` | string | no | — | Case-sensitive substring matched against each item's task URL. Use to narrow the listing to one folder. |
+
+## `cancel_queue_item`
+
+Drop a pending queue item by id before it starts. **Mutating** — suppressed
+when `JENKINS_MCP_READONLY` is truthy. Uses the Jenkins `/queue/cancelItem`
+endpoint, which (by design) returns HTTP 404 on success with an empty body;
+a 404 with a body is treated as "item already left the queue".
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `item_id` | integer | yes | — | Queue item id (from `list_queue`). Must be positive. |

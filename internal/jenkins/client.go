@@ -4,12 +4,15 @@ package jenkins
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -40,6 +43,11 @@ type Client struct {
 	user    string
 	token   string
 	http    *http.Client
+
+	crumbMu      sync.Mutex
+	crumbFetched bool
+	crumbHeader  string
+	crumbValue   string
 }
 
 // Config carries the inputs needed to construct a Client.
@@ -108,6 +116,105 @@ func (c *Client) Get(ctx context.Context, path string, query map[string]string) 
 		return nil, fmt.Errorf("jenkins %s returned HTTP %d: %s", req.URL.Path, resp.StatusCode, snippet)
 	}
 	return body, nil
+}
+
+// Post issues an authenticated POST. When form is non-nil, the body is
+// x-www-form-urlencoded. A CSRF crumb is fetched lazily (once per client) and
+// attached when the crumb issuer is enabled. Non-2xx responses are returned as
+// errors. Use PostWithStatus for endpoints with quirky success semantics
+// (e.g. /queue/cancelItem returns 404 on success).
+func (c *Client) Post(ctx context.Context, path string, query map[string]string, form url.Values) ([]byte, error) {
+	body, status, err := c.doPost(ctx, path, query, form)
+	if err != nil {
+		return nil, err
+	}
+	if status/100 != 2 {
+		snippet := string(body)
+		if len(snippet) > 300 {
+			snippet = snippet[:300] + "..."
+		}
+		return nil, fmt.Errorf("jenkins %s returned HTTP %d: %s", path, status, snippet)
+	}
+	return body, nil
+}
+
+// PostWithStatus is like Post but surfaces the response status to the caller
+// without erroring on non-2xx. The returned error is only set for
+// transport-level failures.
+func (c *Client) PostWithStatus(ctx context.Context, path string, query map[string]string, form url.Values) ([]byte, int, error) {
+	return c.doPost(ctx, path, query, form)
+}
+
+func (c *Client) doPost(ctx context.Context, path string, query map[string]string, form url.Values) ([]byte, int, error) {
+	var bodyReader io.Reader
+	if form != nil {
+		bodyReader = strings.NewReader(form.Encode())
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bodyReader)
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(query) > 0 {
+		q := req.URL.Query()
+		for k, v := range query {
+			q.Set(k, v)
+		}
+		req.URL.RawQuery = q.Encode()
+	}
+	if form != nil {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	}
+	req.SetBasicAuth(c.user, c.token)
+	if header, value, err := c.crumb(ctx); err != nil {
+		return nil, 0, err
+	} else if header != "" {
+		req.Header.Set(header, value)
+	}
+	debugf("req  POST %s", req.URL.Path)
+	start := time.Now()
+	resp, err := c.http.Do(req)
+	if err != nil {
+		debugf("err  POST %s after %s: %v", req.URL.Path, time.Since(start), err)
+		return nil, 0, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		debugf("err  POST %s read body after %s: %v", req.URL.Path, time.Since(start), err)
+		return nil, 0, err
+	}
+	debugf("resp %d POST %s in %s (%d bytes)", resp.StatusCode, req.URL.Path, time.Since(start), len(body))
+	return body, resp.StatusCode, nil
+}
+
+// crumb fetches and caches the CSRF crumb. Empty header means the crumb
+// issuer is disabled on this Jenkins (HTTP 404 on /crumbIssuer/api/json) —
+// callers should proceed without a crumb header.
+func (c *Client) crumb(ctx context.Context) (header, value string, err error) {
+	c.crumbMu.Lock()
+	defer c.crumbMu.Unlock()
+	if c.crumbFetched {
+		return c.crumbHeader, c.crumbValue, nil
+	}
+	body, err := c.Get(ctx, "/crumbIssuer/api/json", nil)
+	if err != nil {
+		if strings.Contains(err.Error(), "HTTP 404") {
+			c.crumbFetched = true
+			return "", "", nil
+		}
+		return "", "", fmt.Errorf("fetch CSRF crumb: %w", err)
+	}
+	var payload struct {
+		Crumb             string `json:"crumb"`
+		CrumbRequestField string `json:"crumbRequestField"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return "", "", fmt.Errorf("parse CSRF crumb response: %w", err)
+	}
+	c.crumbHeader = payload.CrumbRequestField
+	c.crumbValue = payload.Crumb
+	c.crumbFetched = true
+	return c.crumbHeader, c.crumbValue, nil
 }
 
 // JobAPIPath converts a slash-separated job path like

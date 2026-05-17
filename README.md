@@ -5,9 +5,9 @@
 
 **A focused, fast Model Context Protocol (MCP) server for Jenkins, written in Go.**
 
-Give your LLM agent eyes into Jenkins: fetch console logs, inspect pipeline stages,
-parse JUnit reports, and zero in on Ginkgo failures — all over a single, read-only
-MCP stdio transport.
+Give your LLM agent eyes (and hands, opt-out) into Jenkins: fetch console logs,
+inspect pipeline stages, parse JUnit reports, zero in on Ginkgo failures, and
+manage the build queue — all over a single MCP stdio transport.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/2001adarsh/jenkins-mcp-go.svg)](https://pkg.go.dev/github.com/2001adarsh/jenkins-mcp-go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/2001adarsh/jenkins-mcp-go)](https://goreportcard.com/report/github.com/2001adarsh/jenkins-mcp-go)
@@ -28,8 +28,9 @@ console log without re-downloading it on every question.
 
 **jenkins-mcp-go** is built for that workflow:
 
-- **Read-only by design.** Every tool is a `GET`. The server can't trigger
-  builds, change configuration, or post anything back to Jenkins.
+- **Read-first, opt-out writes.** Read tools are always on. Write tools
+  (e.g. `cancel_queue_item`) are gated by `JENKINS_MCP_READONLY`: set the
+  env var and the server registers only the read surface.
 - **Single-host, single-credential.** It talks to one Jenkins URL with one
   API token, configured by environment variables. No multi-tenant surface,
   no credential vault to misuse.
@@ -57,6 +58,8 @@ console log without re-downloading it on every question.
 | `get_failure_summary` | Parse Ginkgo's `Summarizing N Failure` block and surface the first `[ERROR]` tagged with each spec name. |
 | `list_nodes` | List Jenkins agents/nodes with status, executor counts, labels, and monitor summaries. |
 | `get_node` | Per-node detail: status, per-executor idle state, labels, full monitor data. |
+| `list_queue` | List pending Jenkins queue items with the block reason for each. |
+| `cancel_queue_item` | Drop a pending queue item by id. **Mutating**; suppressed when `JENKINS_MCP_READONLY` is set. |
 
 Build-targeted tools take a `job_path` (slash-separated, e.g.
 `Builds/team/job-name`) and an optional `build_number` (`0` or omitted =
@@ -220,7 +223,8 @@ internal/tools/
 ├─ pipeline.go                  get_pipeline_stages, get_stage_log
 ├─ tests.go                     get_test_report
 ├─ failures.go                  get_failure_summary (Ginkgo)
-└─ nodes.go                     list_nodes, get_node
+├─ nodes.go                     list_nodes, get_node
+└─ queue.go                     list_queue, cancel_queue_item
 ```
 
 `internal/` is intentionally not importable by external modules; the public
@@ -228,9 +232,9 @@ surface of this repository is the binary.
 
 ## Security notes
 
-- **Read-only by construction.** Every Jenkins HTTP call is a `GET`. There is
-  no `POST`/`PUT`/`DELETE` code path. Build-triggering, configuration changes,
-  and credential operations are not exposed.
+- **Mutations are opt-out.** Read tools issue only `GET`. Write tools
+  (`cancel_queue_item`, etc.) use `POST` with a CSRF crumb and are
+  suppressed entirely when `JENKINS_MCP_READONLY` is truthy.
 - **One host, one credential.** Credentials come from the environment and are
   used only against `JENKINS_URL`. There is no host argument on any tool.
 - **No credential echo.** The server never includes credentials in tool
