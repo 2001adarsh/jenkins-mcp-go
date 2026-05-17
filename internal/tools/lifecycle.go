@@ -114,13 +114,13 @@ type queueItemExecutable struct {
 
 type queueItemResponse struct {
 	ID         int64                `json:"id"`
-	Cancelled  bool                 `json:"cancelled"`
+	Canceled   bool                 `json:"cancelled"` //nolint:misspell // Jenkins emits this field as "cancelled"
 	Why        string               `json:"why"`
 	Executable *queueItemExecutable `json:"executable"`
 }
 
 // pollQueueItem polls /queue/item/<id>/api/json until the item gets an
-// executable (build assigned), is cancelled, the context is cancelled, or
+// executable (build assigned), is canceled, the context is canceled, or
 // waitForStartTimeout elapses. Returns the build number (0 if still queued),
 // the executor URL, and the last "why" reason for diagnostics.
 func (d Deps) pollQueueItem(ctx context.Context, queueItemID string) (number int64, executorURL, why string, err error) {
@@ -137,8 +137,8 @@ func (d Deps) pollQueueItem(ctx context.Context, queueItemID string) (number int
 		if jsonErr := json.Unmarshal(body, &item); jsonErr != nil {
 			return 0, "", "", fmt.Errorf("parse queue item JSON: %w", jsonErr)
 		}
-		if item.Cancelled {
-			return 0, "", "build was cancelled before starting", nil
+		if item.Canceled {
+			return 0, "", "build was canceled before starting", nil
 		}
 		if item.Executable != nil && item.Executable.Number > 0 {
 			return item.Executable.Number, item.Executable.URL, item.Why, nil

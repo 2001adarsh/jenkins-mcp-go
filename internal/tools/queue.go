@@ -96,7 +96,7 @@ type CancelQueueItemInput struct {
 // CancelQueueItem drops a pending queue item by id. Jenkins returns 404 on
 // success for this endpoint (treated here as the canonical success signal);
 // other non-2xx responses surface as errors. An item that has already left
-// the queue (started or was cancelled by someone else) returns a clear
+// the queue (started or was canceled by someone else) returns a clear
 // "already left queue" message rather than a generic 404.
 func (d Deps) CancelQueueItem(ctx context.Context, _ *mcp.CallToolRequest, in CancelQueueItemInput) (*mcp.CallToolResult, any, error) {
 	if in.ItemID <= 0 {
@@ -113,14 +113,14 @@ func (d Deps) CancelQueueItem(ctx context.Context, _ *mcp.CallToolRequest, in Ca
 	trimmed := strings.TrimSpace(string(body))
 	switch {
 	case status/100 == 2:
-		return textResult(fmt.Sprintf("Cancelled queue item %d.", in.ItemID)), nil, nil
+		return textResult(fmt.Sprintf("Canceled queue item %d.", in.ItemID)), nil, nil
 	case status == 404 && trimmed == "":
 		return textResult(fmt.Sprintf(
-			"Cancelled queue item %d (Jenkins returned HTTP 404 with empty body, "+
+			"Canceled queue item %d (Jenkins returned HTTP 404 with empty body, "+
 				"which this endpoint uses as the success signal).", in.ItemID)), nil, nil
 	case status == 404:
 		return textResult(fmt.Sprintf(
-			"Queue item %d has already left the queue (build started or item was cancelled by another caller).",
+			"Queue item %d has already left the queue (build started or item was canceled by another caller).",
 			in.ItemID)), nil, nil
 	default:
 		snippet := trimmed

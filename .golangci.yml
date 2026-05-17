@@ -18,7 +18,7 @@ linters:
     - unused
   settings:
     misspell:
-      locale: UK
+      locale: US
     revive:
       rules:
         - name: exported
