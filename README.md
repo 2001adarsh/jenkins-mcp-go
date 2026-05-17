@@ -104,6 +104,7 @@ and no command-line flags — keep credentials out of process arguments.
 | `JENKINS_MCP_CACHE_MAX` | no | `1073741824` (1 GiB) | Soft cap on cache size in bytes. Evicts oldest-mtime files first. |
 | `JENKINS_MCP_TIMEOUT` | no | `90s` | HTTP timeout (Go duration: `30s`, `2m`, etc.). |
 | `JENKINS_MCP_DEBUG` | no | unset | When set to any non-empty value, emits one stderr line per outbound Jenkins request and cache event. See [`docs/DEBUGGING.md`](docs/DEBUGGING.md). |
+| `JENKINS_MCP_READONLY` | no | unset | When truthy (`1`/`true`/`yes`, case-insensitive), suppresses registration of any tool that mutates Jenkins state. Active mode is logged at startup. |
 
 > **Note** — `JENKINS_API_TOKEN` should be a Jenkins **API token**, not your
 > account password. In Jenkins, navigate to your user menu → **Configure** →
