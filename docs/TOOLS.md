@@ -187,3 +187,28 @@ a 404 with a body is treated as "item already left the queue".
 | Field | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | `item_id` | integer | yes | — | Queue item id (from `list_queue`). Must be positive. |
+
+## `trigger_build`
+
+Queue a build. With no `parameters`, POSTs to `/<job>/build`; with
+parameters, POSTs to `/<job>/buildWithParameters` with each entry sent as
+a raw form field (no type coercion). Returns the queue item URL from the
+response `Location` header. **Mutating** — suppressed when
+`JENKINS_MCP_READONLY` is truthy.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `job_path` | string | yes | — | Slash-separated job path. |
+| `parameters` | object<string,string> | no | — | Form fields for `buildWithParameters`. Values are sent as-is. |
+| `wait_for_start` | bool | no | `false` | When true, poll `/queue/item/<id>/api/json` for up to 60s and return the assigned build number once the item leaves the queue. |
+
+## `stop_build`
+
+Abort a running build via `/<job>/<n>/stop`. **Mutating** — suppressed
+when `JENKINS_MCP_READONLY` is truthy. Confirm the abort took effect with
+`get_build_info` (expect `result=ABORTED`).
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `job_path` | string | yes | — | Slash-separated job path. |
+| `build_number` | integer | yes | — | Must be positive; `lastBuild` is not accepted. |

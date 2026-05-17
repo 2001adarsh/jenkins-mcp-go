@@ -175,6 +175,19 @@ func run() error {
 			"Returns a clear 'already left queue' message when the item has already been built or cancelled.",
 	}, deps.CancelQueueItem)
 
+	addWriteTool(srv, cfg, &mcp.Tool{
+		Name: "trigger_build",
+		Description: "Queue a Jenkins build, optionally with parameters (raw strings — no type coercion). " +
+			"With wait_for_start=true, polls the queue item for up to 60s and returns the assigned " +
+			"build number. Mutates Jenkins state.",
+	}, deps.TriggerBuild)
+
+	addWriteTool(srv, cfg, &mcp.Tool{
+		Name: "stop_build",
+		Description: "Abort a running Jenkins build by job_path + build_number. Mutates Jenkins state. " +
+			"Confirm the abort took effect with get_build_info (expect result=ABORTED).",
+	}, deps.StopBuild)
+
 	return srv.Run(context.Background(), &mcp.StdioTransport{})
 }
 

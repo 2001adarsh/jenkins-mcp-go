@@ -60,6 +60,8 @@ console log without re-downloading it on every question.
 | `get_node` | Per-node detail: status, per-executor idle state, labels, full monitor data. |
 | `list_queue` | List pending Jenkins queue items with the block reason for each. |
 | `cancel_queue_item` | Drop a pending queue item by id. **Mutating**; suppressed when `JENKINS_MCP_READONLY` is set. |
+| `trigger_build` | Queue a build, optionally with parameters; can block until the build is assigned a number. **Mutating**. |
+| `stop_build` | Abort a running build. **Mutating**. |
 
 Build-targeted tools take a `job_path` (slash-separated, e.g.
 `Builds/team/job-name`) and an optional `build_number` (`0` or omitted =
@@ -224,7 +226,8 @@ internal/tools/
 ├─ tests.go                     get_test_report
 ├─ failures.go                  get_failure_summary (Ginkgo)
 ├─ nodes.go                     list_nodes, get_node
-└─ queue.go                     list_queue, cancel_queue_item
+├─ queue.go                     list_queue, cancel_queue_item
+└─ lifecycle.go                 trigger_build, stop_build
 ```
 
 `internal/` is intentionally not importable by external modules; the public
