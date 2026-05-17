@@ -19,6 +19,9 @@
 //	                       hit/write/eviction. Never writes credentials,
 //	                       request headers, or response bodies. See
 //	                       docs/DEBUGGING.md.
+//	JENKINS_MCP_READONLY   When truthy (1/true/yes, case-insensitive), skip
+//	                       registration of any tool that mutates Jenkins
+//	                       state. Default off.
 //
 // All network access is limited to JENKINS_URL. The server speaks MCP over
 // stdio and is intended to be launched by an MCP-aware client.
@@ -31,6 +34,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -78,6 +82,12 @@ func run() error {
 		Name:    "jenkins",
 		Version: version,
 	}, nil)
+
+	mode := "read-write"
+	if cfg.ReadOnly {
+		mode = "read-only"
+	}
+	log.Printf("jenkins-mcp %s (%s)", version, mode)
 
 	mcp.AddTool(srv, &mcp.Tool{
 		Name: "list_jobs",
@@ -149,6 +159,26 @@ type config struct {
 	CacheDir string
 	CacheMax int64
 	Timeout  time.Duration
+	ReadOnly bool
+}
+
+// addWriteTool registers a write tool only when read-only mode is off.
+// Keeps the read-only gate in one place as the write-tool surface grows.
+func addWriteTool[In, Out any](srv *mcp.Server, cfg config, t *mcp.Tool, h mcp.ToolHandlerFor[In, Out]) {
+	if cfg.ReadOnly {
+		return
+	}
+	mcp.AddTool(srv, t, h)
+}
+
+// truthyEnv reports whether v looks like an opt-in boolean: 1/true/yes,
+// case-insensitive. Empty and everything else are false.
+func truthyEnv(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "1", "true", "yes":
+		return true
+	}
+	return false
 }
 
 func loadConfig() (config, error) {
@@ -181,6 +211,8 @@ func loadConfig() (config, error) {
 		}
 		cfg.Timeout = d
 	}
+
+	cfg.ReadOnly = truthyEnv(os.Getenv("JENKINS_MCP_READONLY"))
 
 	return cfg, nil
 }
