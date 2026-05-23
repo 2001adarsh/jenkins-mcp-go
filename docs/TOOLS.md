@@ -67,6 +67,29 @@ The response is capped at **500 entries**. If the cap is hit, the output
 ends with a hint to narrow with `folder_path` or `name_filter` (Jenkins'
 `/api/json` does not paginate).
 
+## `list_branches`
+
+Enumerate the branches of a `WorkflowMultiBranchProject` with per-branch
+last-build state. Multibranch jobs are the standard way to model
+PR + long-lived-branch CI in Jenkins; this tool gives the agent a focused
+view that `list_jobs` (which is generic) does not.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `job_path` | string | yes | — | Slash-separated path to a `WorkflowMultiBranchProject` (e.g. `Builds/team/svc-x`). Multibranches show up as `type=folder` in `list_jobs`. |
+| `name_filter` | string | no | — | Case-insensitive RE2 regex matched against each branch name. |
+| `healthy_only` | bool | no | `false` | Exclude branches whose last build was not `SUCCESS`. Never-built branches are also excluded under this flag. |
+
+Output is a compact table: `branch | last# | result | duration | last_built_at | url`.
+Duration is rendered as a Go duration string truncated to whole seconds
+(e.g. `2m15s`); `last_built_at` is the build start time in UTC RFC 3339.
+Branches that have never been built render `-` in the build-related columns.
+
+When `job_path` resolves to a `_class` that isn't a `WorkflowMultiBranchProject`
+(for example, a regular `FreeStyleProject` or an `OrganizationFolder`), the
+tool returns a hint that points back at `list_jobs` instead of an empty
+table.
+
 ## `get_console_log`
 
 Fetch the build's `/consoleText`. Returns the last 500 lines by default; pass

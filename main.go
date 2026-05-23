@@ -111,6 +111,14 @@ func run() error {
 	}, deps.ListJobs)
 
 	mcp.AddTool(srv, &mcp.Tool{
+		Name: "list_branches",
+		Description: "Enumerate the branches of a Jenkins WorkflowMultiBranchProject with per-branch " +
+			"last-build state (number, result, duration, timestamp). Optional name_filter (case-insensitive " +
+			"RE2) narrows by branch name; healthy_only=true keeps only SUCCESS branches. Returns a hint " +
+			"and points back to list_jobs if job_path isn't a multibranch container.",
+	}, deps.ListBranches)
+
+	mcp.AddTool(srv, &mcp.Tool{
 		Name: "get_console_log",
 		Description: "Fetch Jenkins build console output. Returns last 500 lines by default; " +
 			"pass tail_lines explicitly (negative = full log). The response footer reports the " +

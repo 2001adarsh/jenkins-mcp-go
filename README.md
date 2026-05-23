@@ -51,6 +51,7 @@ console log without re-downloading it on every question.
 | --- | --- |
 | `health_check` | Validate the server's setup: Jenkins reachability and version, authenticated user, CSRF crumb issuer, Pipeline/JUnit plugin presence, online/offline node counts, clock skew, and the effective config the process is running with. |
 | `list_jobs` | Enumerate jobs and folders under a path (or root). Optional recursion and case-insensitive RE2 name filter; capped at 500 entries. |
+| `list_branches` | Enumerate the branches of a `WorkflowMultiBranchProject` with per-branch last-build number, result, duration, and timestamp. Optional `name_filter` (RE2) and `healthy_only`. |
 | `get_console_log` | Tail the build's `/consoleText`. Defaults to last 500 lines; pass `tail_lines: -1` for the full log. |
 | `get_console_log_path` | Force-cache the full log for a completed build and return its on-disk path so the agent can `Read`/`Grep`/`Bash` it natively. |
 | `search_console_log` | RE2 regex search over the console log with line-number-aware context windows. |
