@@ -7,8 +7,9 @@
 
 Connect Jenkins to Claude Desktop, Claude Code, Cursor, or any MCP-compatible
 AI agent: fetch console logs, inspect pipeline stages, parse JUnit and Ginkgo
-test reports, trigger and abort builds, and manage the build queue — all over
-a single MCP stdio transport, from one static Go binary.
+test reports, diff two builds, rank flaky tests, trigger and abort builds, and
+manage the build queue — all over a single MCP stdio transport, from one
+static Go binary.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/2001adarsh/jenkins-mcp-go.svg)](https://pkg.go.dev/github.com/2001adarsh/jenkins-mcp-go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/2001adarsh/jenkins-mcp-go)](https://goreportcard.com/report/github.com/2001adarsh/jenkins-mcp-go)
@@ -36,6 +37,15 @@ console log without re-downloading it on every question.
 - **Single-host, single-credential.** It talks to one Jenkins URL with one
   API token, configured by environment variables. No multi-tenant surface,
   no credential vault to misuse.
+- **Triage-shaped, not API-shaped.** Tools answer the questions agents
+  actually ask — *"what changed between build A and B?"* (`compare_builds`),
+  *"which tests in this job are flaky?"* (`get_flaky_candidates`), *"what
+  commits and files touched this build?"* (`get_scm_context`) — instead of
+  mirroring Jenkins endpoints one-for-one.
+- **Built for context windows.** Every listing tool takes an RE2 filter and
+  a cap. `get_console_log_path` returns the on-disk path of a finished
+  build's log so the agent can `Read`/`Grep`/`Bash` it natively instead of
+  streaming gigabytes through MCP.
 - **Disk-cached console logs.** Finished builds are saved once and reused.
   The cache is keyed by job path + build number, capped by total size, and
   evicted by LRU mtime.
@@ -194,6 +204,12 @@ Once the server is registered, ask your agent things like:
   → calls `get_console_log` with `tail_lines: 200`.
 - *"Find every line matching `panic|fatal` in build 4521 with five lines of context."*
   → calls `search_console_log` with `pattern: "panic|fatal"`, `context_lines: 5`.
+- *"Build 91 passed but 92 failed — what changed?"*
+  → calls `compare_builds` with `build_a: 91`, `build_b: 92`.
+- *"Which tests in `Builds/team/integration-tests` have been flipping between pass and fail recently?"*
+  → calls `get_flaky_candidates`.
+- *"Which commits in build 86 touched anything under `internal/auth/`?"*
+  → calls `get_scm_context` with `path_filter: "^internal/auth/"`.
 - *"Which Ginkgo specs failed in build 92 and what was the first error each emitted?"*
   → calls `get_failure_summary`.
 - *"Cache the full log for build 4521 so I can grep it locally."*
@@ -226,11 +242,17 @@ internal/jenkins/
 
 internal/tools/
 ├─ common.go                    Deps struct, shared response helpers
+├─ health.go                    health_check
 ├─ jobs.go                      list_jobs
+├─ branches.go                  list_branches
 ├─ console.go                   get_console_log, get_console_log_path, search_console_log
 ├─ build.go                     get_build_info
+├─ scm.go                       get_scm_context
+├─ compare.go                   compare_builds
 ├─ pipeline.go                  get_pipeline_stages, get_stage_log
-├─ tests.go                     get_test_report
+├─ testreport.go                get_test_report
+├─ flaky.go                     get_flaky_candidates
+├─ junit_status.go              shared JUnit status normalization
 ├─ failures.go                  get_failure_summary (Ginkgo)
 ├─ nodes.go                     list_nodes, get_node
 ├─ queue.go                     list_queue, cancel_queue_item
