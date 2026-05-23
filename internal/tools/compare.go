@@ -353,36 +353,18 @@ func renderStagesDiff(w *strings.Builder, a, b *compareSnapshot) {
 	w.WriteString("\n")
 }
 
-// testStatus collapses Jenkins' per-case status into a tri-state suitable
-// for diffing. PASSED/FIXED both mean "currently passing"; FAILED/REGRESSION
-// both mean "currently failing"; anything else (SKIPPED, etc.) is absent.
-type testStatus int
-
-const (
-	tsAbsent testStatus = iota
-	tsPass
-	tsFail
-)
-
-func testStatusOf(s string) testStatus {
-	switch s {
-	case "PASSED", "FIXED":
-		return tsPass
-	case "FAILED", "REGRESSION":
-		return tsFail
-	default:
-		return tsAbsent
-	}
-}
-
-func collectTests(rep *junitReport) map[string]testStatus {
-	m := map[string]testStatus{}
+// collectTests folds a JUnit report into a {className.name → state} map.
+// SKIPPED collapses to StateSkip; compare_builds itself doesn't split
+// pass↔skip transitions (only pass↔fail), so the renderer treats Skip
+// the same as Unknown when bucketing.
+func collectTests(rep *junitReport) map[string]JUnitState {
+	m := map[string]JUnitState{}
 	if rep == nil {
 		return m
 	}
 	for _, suite := range rep.Suites {
 		for _, c := range suite.Cases {
-			m[c.ClassName+"."+c.Name] = testStatusOf(c.Status)
+			m[c.ClassName+"."+c.Name] = NormalizeJUnitStatus(c.Status)
 		}
 	}
 	return m
@@ -410,18 +392,18 @@ func renderTestsDiff(w *strings.Builder, a, b *compareSnapshot) {
 		if !ok {
 			label := k
 			switch sB {
-			case tsFail:
+			case StateFail:
 				label = k + " [FAILED]"
-			case tsPass:
+			case StatePass:
 				label = k + " [PASSED]"
 			}
 			newTests = append(newTests, label)
 			continue
 		}
 		switch {
-		case sA == tsPass && sB == tsFail:
+		case sA == StatePass && sB == StateFail:
 			passToFail = append(passToFail, k)
-		case sA == tsFail && sB == tsPass:
+		case sA == StateFail && sB == StatePass:
 			failToPass = append(failToPass, k)
 		}
 	}

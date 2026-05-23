@@ -68,7 +68,7 @@ type flakyJobAPI struct {
 // empty and Err nil.
 type flakyBuildResult struct {
 	BuildNumber int64
-	Tests       map[string]string // key=className.name → "PASS"/"FAIL"/"SKIP"
+	Tests       map[string]JUnitState // key=className.name
 	Err         error
 }
 
@@ -170,7 +170,7 @@ func (d Deps) fetchFlakyResults(ctx context.Context, jobPath string, builds []in
 }
 
 func (d Deps) fetchOneFlakyResult(ctx context.Context, jobPath string, num int64) flakyBuildResult {
-	res := flakyBuildResult{BuildNumber: num, Tests: map[string]string{}}
+	res := flakyBuildResult{BuildNumber: num, Tests: map[string]JUnitState{}}
 	path := jenkins.JobAPIPath(jobPath) + "/" + strconv.FormatInt(num, 10) + "/testReport/api/json"
 	body, err := d.Client.Get(ctx, path, map[string]string{"tree": flakyTestsTree})
 	if err != nil {
@@ -187,28 +187,12 @@ func (d Deps) fetchOneFlakyResult(ctx context.Context, jobPath string, num int64
 	}
 	for _, suite := range rep.Suites {
 		for _, c := range suite.Cases {
-			if state := normalizeFlakyStatus(c.Status); state != "" {
+			if state := NormalizeJUnitStatus(c.Status); state != StateUnknown {
 				res.Tests[c.ClassName+"."+c.Name] = state
 			}
 		}
 	}
 	return res
-}
-
-// normalizeFlakyStatus collapses Jenkins' per-case statuses to the three
-// states the flip counter cares about. Empty string means "ignore this
-// case" (unknown status from a plugin we don't model).
-func normalizeFlakyStatus(s string) string {
-	switch s {
-	case "PASSED", "FIXED":
-		return "PASS"
-	case "FAILED", "REGRESSION":
-		return "FAIL"
-	case "SKIPPED":
-		return "SKIP"
-	default:
-		return ""
-	}
 }
 
 // aggregateFlaky walks results in build-number order and builds per-test
@@ -222,13 +206,13 @@ func aggregateFlaky(results []flakyBuildResult, includeSkipped bool) []flakyTest
 	})
 
 	type seq struct {
-		states   []string
+		states   []JUnitState
 		lastSeen int64
 	}
 	perTest := map[string]*seq{}
 	for _, r := range sorted {
 		for name, state := range r.Tests {
-			if state == "SKIP" && !includeSkipped {
+			if state == StateSkip && !includeSkipped {
 				continue
 			}
 			s := perTest[name]
@@ -248,9 +232,9 @@ func aggregateFlaky(results []flakyBuildResult, includeSkipped bool) []flakyTest
 		var passes, failures, flips int
 		for i, st := range s.states {
 			switch st {
-			case "PASS":
+			case StatePass:
 				passes++
-			case "FAIL":
+			case StateFail:
 				failures++
 			}
 			if i > 0 && s.states[i] != s.states[i-1] {

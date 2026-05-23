@@ -372,19 +372,19 @@ func TestGetFlakyCandidates_LastSeenIsLatestBuild(t *testing.T) {
 	}
 }
 
-func TestNormalizeFlakyStatus(t *testing.T) {
-	cases := map[string]string{
-		"PASSED":     "PASS",
-		"FIXED":      "PASS",
-		"FAILED":     "FAIL",
-		"REGRESSION": "FAIL",
-		"SKIPPED":    "SKIP",
-		"":           "",
-		"OTHER":      "",
+func TestNormalizeJUnitStatus(t *testing.T) {
+	cases := map[string]JUnitState{
+		"PASSED":     StatePass,
+		"FIXED":      StatePass,
+		"FAILED":     StateFail,
+		"REGRESSION": StateFail,
+		"SKIPPED":    StateSkip,
+		"":           StateUnknown,
+		"OTHER":      StateUnknown,
 	}
 	for in, want := range cases {
-		if got := normalizeFlakyStatus(in); got != want {
-			t.Errorf("normalizeFlakyStatus(%q) = %q, want %q", in, got, want)
+		if got := NormalizeJUnitStatus(in); got != want {
+			t.Errorf("NormalizeJUnitStatus(%q) = %v, want %v", in, got, want)
 		}
 	}
 }
