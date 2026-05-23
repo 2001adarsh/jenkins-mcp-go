@@ -7,7 +7,9 @@ package tools
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -48,6 +50,29 @@ func compileFilter(paramName, expr string) (*regexp.Regexp, error) {
 // Go-style string truncated to whole seconds (e.g. "2m15s", "1h2m3s").
 func formatBuildDuration(millis int64) string {
 	return (time.Duration(millis) * time.Millisecond).Truncate(time.Second).String()
+}
+
+// truncate shortens s to at most n runes, replacing the trailing rune with
+// "…" when truncation happens. Rune-aware so it never splits a multi-byte
+// codepoint and so callers get a predictable display width.
+func truncate(s string, n int) string {
+	runes := []rune(s)
+	if len(runes) <= n {
+		return s
+	}
+	return string(runes[:n-1]) + "…"
+}
+
+// padRight pads s with spaces on the right so its rune-counted width
+// equals width. Use this for tabular columns whose contents may include
+// multi-byte runes — Go's %-Ns format pads by byte count, which under-pads
+// non-ASCII or the "…" returned by truncate.
+func padRight(s string, width int) string {
+	n := utf8.RuneCountInString(s)
+	if n >= width {
+		return s
+	}
+	return s + strings.Repeat(" ", width-n)
 }
 
 // pathFooter formats the trailing breadcrumb that points callers at the

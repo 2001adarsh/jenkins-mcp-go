@@ -246,6 +246,42 @@ snippet of the stack trace.
 
 Returns a hint message if the build has no JUnit publisher (HTTP 404).
 
+## `get_flaky_candidates`
+
+Rank flaky tests across the latest `sample_size` completed builds of one
+job by counting pass↔fail flips in each test's status sequence. Use this
+to surface "which tests are flaky here?" — the discovery step before
+drilling into one test's history with `get_test_report`.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `job_path` | string | yes | — | Slash-separated job path. |
+| `sample_size` | integer | no | `20` | Number of most-recent completed builds to inspect. Capped at 50; in-progress builds at the head don't count. |
+| `min_flips` | integer | no | `2` | Minimum pass↔fail transitions for a test to appear in the output. |
+| `include_skipped` | bool | no | `false` | When true, SKIPPED counts as a state in the flip sequence (a PASS→SKIP→FAIL pattern then registers 2 flips). When false, SKIPPED records are ignored. |
+
+A "flip" is an adjacent state change in a test's status sequence ordered
+by build number ascending. `PASSED`/`FIXED` collapse to `PASS`;
+`FAILED`/`REGRESSION` collapse to `FAIL`. Unknown statuses are treated
+as absent.
+
+Builds without a test report (HTTP 404 on `/testReport/api/json`) are
+skipped and counted in a footer line. The tool emits a hint instead of
+the table when fewer than two completed builds exist under the job.
+
+Output: header with the effective inputs, optionally the "no test
+report" footer, then a sorted table:
+
+```
+test                                                          flips  passes  failures  last_seen_build
+------------------------------------------------------------  -----  ------  --------  ---------------
+pkg.payment.AuthorizeCard                                         5       8         7               86
+pkg.refund.RefundFlow                                             3      10         5               85
+```
+
+Rows are sorted by flips desc, then failures desc, then test name asc
+for stable ordering. The `test` column is rune-truncated at 60 chars.
+
 ## `get_failure_summary`
 
 Parse Ginkgo's `Summarizing N Failure` block and, for each failing spec,
