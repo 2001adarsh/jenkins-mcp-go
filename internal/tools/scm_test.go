@@ -324,6 +324,8 @@ func TestEditCode(t *testing.T) {
 		"rename":  "R",
 		"copy":    "C",
 		"unknown": "U",
+		"ñew":     "Ñ",
+		"日本語":     "日",
 	}
 	for in, want := range cases {
 		if got := editCode(in); got != want {

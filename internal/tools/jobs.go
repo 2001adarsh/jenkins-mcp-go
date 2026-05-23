@@ -70,13 +70,9 @@ type listingEntry struct {
 // even when their own name does not match, since matching jobs may live
 // inside them.
 func (d Deps) ListJobs(ctx context.Context, _ *mcp.CallToolRequest, in ListJobsInput) (*mcp.CallToolResult, any, error) {
-	var nameRe *regexp.Regexp
-	if in.NameFilter != "" {
-		re, err := regexp.Compile("(?i)" + in.NameFilter)
-		if err != nil {
-			return nil, nil, fmt.Errorf("invalid name_filter: %w", err)
-		}
-		nameRe = re
+	nameRe, err := compileFilter("name_filter", in.NameFilter)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	var (

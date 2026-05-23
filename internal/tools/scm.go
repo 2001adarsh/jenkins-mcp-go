@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -76,13 +77,9 @@ func (d Deps) GetSCMContext(ctx context.Context, _ *mcp.CallToolRequest, in GetS
 	if maxCommits <= 0 {
 		maxCommits = defaultMaxCommits
 	}
-	var pathRe *regexp.Regexp
-	if in.PathFilter != "" {
-		re, err := regexp.Compile("(?i)" + in.PathFilter)
-		if err != nil {
-			return nil, nil, fmt.Errorf("invalid path_filter: %w", err)
-		}
-		pathRe = re
+	pathRe, err := compileFilter("path_filter", in.PathFilter)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	buildRef := jenkins.BuildRef(in.BuildNumber)
@@ -217,7 +214,7 @@ func firstLine(s string) string {
 
 // editCode maps Jenkins EditType strings ("add"/"edit"/"delete") to the
 // single-letter codes git callers expect (A/M/D). Unknown values fall back
-// to the upper-cased first letter so plugin-specific types remain visible.
+// to the upper-cased first rune so plugin-specific types remain visible.
 func editCode(s string) string {
 	switch strings.ToLower(s) {
 	case "add":
@@ -229,6 +226,7 @@ func editCode(s string) string {
 	case "":
 		return "?"
 	default:
-		return strings.ToUpper(s[:1])
+		r, _ := utf8.DecodeRuneInString(s)
+		return strings.ToUpper(string(r))
 	}
 }
