@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -68,7 +69,7 @@ func (d Deps) GetTestReport(ctx context.Context, _ *mcp.CallToolRequest, in GetT
 	path := jenkins.JobAPIPath(in.JobPath) + "/" + jenkins.BuildRef(in.BuildNumber) + "/testReport/api/json"
 	body, err := d.Client.Get(ctx, path, nil)
 	if err != nil {
-		if strings.Contains(err.Error(), "HTTP 404") {
+		if jenkins.IsHTTPStatus(err, http.StatusNotFound) {
 			return textResult(
 				"No test report published for this build (HTTP 404 on /testReport/api/json). " +
 					"The job may not have a JUnit publisher configured — " +

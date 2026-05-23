@@ -76,7 +76,12 @@ func run() error {
 		cache.MaxBytes = cfg.CacheMax
 	}
 
-	deps := tools.Deps{Client: client, Cache: cache}
+	deps := tools.Deps{
+		Client:   client,
+		Cache:    cache,
+		Version:  version,
+		ReadOnly: cfg.ReadOnly,
+	}
 
 	srv := mcp.NewServer(&mcp.Implementation{
 		Name:    "jenkins",
@@ -88,6 +93,14 @@ func run() error {
 		mode = "read-only"
 	}
 	log.Printf("jenkins-mcp %s (%s)", version, mode)
+
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "health_check",
+		Description: "Run a fixed battery of read-only probes against the configured Jenkins and " +
+			"return a one-line-per-check report: reachability, Jenkins version, authenticated user, " +
+			"CSRF crumb issuer, Pipeline/JUnit plugin presence, online/offline node counts, and clock " +
+			"skew. Useful for validating a fresh install or debugging 'the agent says it can't see Jenkins'.",
+	}, deps.HealthCheck)
 
 	mcp.AddTool(srv, &mcp.Tool{
 		Name: "list_jobs",

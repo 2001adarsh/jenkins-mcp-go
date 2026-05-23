@@ -14,8 +14,10 @@ import (
 
 // Deps is the shared dependency set passed to every tool handler.
 type Deps struct {
-	Client *jenkins.Client
-	Cache  *jenkins.ConsoleCache
+	Client   *jenkins.Client
+	Cache    *jenkins.ConsoleCache
+	Version  string
+	ReadOnly bool
 }
 
 // textResult wraps a string as an mcp.CallToolResult.

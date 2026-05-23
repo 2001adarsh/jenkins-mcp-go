@@ -5,6 +5,7 @@ package jenkins
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -15,6 +16,32 @@ import (
 	"sync"
 	"time"
 )
+
+// HTTPError is the error type returned by Client when Jenkins responds with a
+// non-2xx status. Callers can recover the status code and a short body
+// snippet via errors.As, or use IsHTTPStatus for the common
+// "is this a 404?" branch.
+type HTTPError struct {
+	Method     string
+	Path       string
+	StatusCode int
+	Snippet    string
+}
+
+// Error preserves the historical message format ("jenkins <path> returned
+// HTTP <code>: <snippet>") so existing assertions and operator-facing logs
+// keep working after the typed-error refactor.
+func (e *HTTPError) Error() string {
+	return fmt.Sprintf("jenkins %s returned HTTP %d: %s", e.Path, e.StatusCode, e.Snippet)
+}
+
+// IsHTTPStatus reports whether err is (or wraps) an *HTTPError with the
+// given status code. Use this at call sites that need to special-case a
+// specific Jenkins response (404 from /crumbIssuer, /testReport, /wfapi).
+func IsHTTPStatus(err error, status int) bool {
+	var herr *HTTPError
+	return errors.As(err, &herr) && herr.StatusCode == status
+}
 
 // DefaultTimeout is the HTTP timeout used when Config.Timeout is zero.
 const DefaultTimeout = 90 * time.Second
@@ -58,6 +85,11 @@ type Config struct {
 	Timeout time.Duration
 }
 
+// Timeout returns the HTTP client timeout the Jenkins client is using.
+// Useful for tools that want to surface the effective timeout (e.g.
+// health_check) without snapshotting it elsewhere at startup.
+func (c *Client) Timeout() time.Duration { return c.http.Timeout }
+
 // NewClient validates the configuration and returns a ready-to-use Client.
 //
 // BaseURL trailing slashes are trimmed so callers can join paths starting with
@@ -82,9 +114,21 @@ func NewClient(cfg Config) (*Client, error) {
 // and returns the response body. Non-2xx responses are returned as errors with
 // a short body snippet for context.
 func (c *Client) Get(ctx context.Context, path string, query map[string]string) ([]byte, error) {
+	body, _, err := c.doGet(ctx, path, query)
+	return body, err
+}
+
+// GetWithHeaders is like Get but also returns the response headers. Use it
+// for endpoints whose useful information lives in a header (e.g. the
+// X-Jenkins version banner on /api/json).
+func (c *Client) GetWithHeaders(ctx context.Context, path string, query map[string]string) ([]byte, http.Header, error) {
+	return c.doGet(ctx, path, query)
+}
+
+func (c *Client) doGet(ctx context.Context, path string, query map[string]string) ([]byte, http.Header, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if len(query) > 0 {
 		q := req.URL.Query()
@@ -99,23 +143,35 @@ func (c *Client) Get(ctx context.Context, path string, query map[string]string) 
 	resp, err := c.http.Do(req)
 	if err != nil {
 		debugf("err  GET %s after %s: %v", req.URL.Path, time.Since(start), err)
-		return nil, err
+		return nil, nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		debugf("err  GET %s read body after %s: %v", req.URL.Path, time.Since(start), err)
-		return nil, err
+		return nil, nil, err
 	}
 	debugf("resp %d GET %s in %s (%d bytes)", resp.StatusCode, req.URL.Path, time.Since(start), len(body))
 	if resp.StatusCode/100 != 2 {
-		snippet := string(body)
-		if len(snippet) > 300 {
-			snippet = snippet[:300] + "..."
+		return nil, nil, &HTTPError{
+			Method:     http.MethodGet,
+			Path:       req.URL.Path,
+			StatusCode: resp.StatusCode,
+			Snippet:    snippetOf(body),
 		}
-		return nil, fmt.Errorf("jenkins %s returned HTTP %d: %s", req.URL.Path, resp.StatusCode, snippet)
 	}
-	return body, nil
+	return body, resp.Header, nil
+}
+
+// snippetOf returns a short body snippet suitable for error messages.
+// Long bodies are truncated; the cap mirrors what the previous inline
+// formatter used.
+func snippetOf(body []byte) string {
+	const max = 300
+	if len(body) <= max {
+		return string(body)
+	}
+	return string(body[:max]) + "..."
 }
 
 // Post issues an authenticated POST. When form is non-nil, the body is
@@ -129,11 +185,12 @@ func (c *Client) Post(ctx context.Context, path string, query map[string]string,
 		return nil, err
 	}
 	if status/100 != 2 {
-		snippet := string(body)
-		if len(snippet) > 300 {
-			snippet = snippet[:300] + "..."
+		return nil, &HTTPError{
+			Method:     http.MethodPost,
+			Path:       path,
+			StatusCode: status,
+			Snippet:    snippetOf(body),
 		}
-		return nil, fmt.Errorf("jenkins %s returned HTTP %d: %s", path, status, snippet)
 	}
 	return body, nil
 }
@@ -206,7 +263,7 @@ func (c *Client) crumb(ctx context.Context) (header, value string, err error) {
 	}
 	body, err := c.Get(ctx, "/crumbIssuer/api/json", nil)
 	if err != nil {
-		if strings.Contains(err.Error(), "HTTP 404") {
+		if IsHTTPStatus(err, http.StatusNotFound) {
 			c.crumbFetched = true
 			return "", "", nil
 		}
