@@ -124,7 +124,7 @@ func checkAuth(ctx context.Context, c *jenkins.Client) healthRow {
 
 func checkCrumb(ctx context.Context, c *jenkins.Client) healthRow {
 	if _, err := c.Get(ctx, "/crumbIssuer/api/json", nil); err != nil {
-		if strings.Contains(err.Error(), "HTTP 404") {
+		if jenkins.IsHTTPStatus(err, http.StatusNotFound) {
 			return healthRow{"CSRF crumb issuer", statusWarn,
 				"disabled — POSTs will skip the crumb header"}
 		}

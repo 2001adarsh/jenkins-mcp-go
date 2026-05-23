@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -53,7 +54,7 @@ func (d Deps) GetPipelineStages(ctx context.Context, _ *mcp.CallToolRequest, in 
 	path := jenkins.JobAPIPath(in.JobPath) + "/" + jenkins.BuildRef(in.BuildNumber) + "/wfapi/describe"
 	body, err := d.Client.Get(ctx, path, nil)
 	if err != nil {
-		if strings.Contains(err.Error(), "HTTP 404") {
+		if jenkins.IsHTTPStatus(err, http.StatusNotFound) {
 			return textResult(
 				"No pipeline stage data (HTTP 404 on /wfapi/describe). " +
 					"This is not a Declarative/Scripted Pipeline build.",
@@ -96,7 +97,7 @@ func (d Deps) GetStageLog(ctx context.Context, _ *mcp.CallToolRequest, in GetSta
 		"/execution/node/" + in.StageID + "/wfapi/log"
 	body, err := d.Client.Get(ctx, path, nil)
 	if err != nil {
-		if strings.Contains(err.Error(), "HTTP 404") {
+		if jenkins.IsHTTPStatus(err, http.StatusNotFound) {
 			return textResult(fmt.Sprintf(
 				"No stage log at /execution/node/%s/wfapi/log (HTTP 404). "+
 					"Stage id may be wrong or build is not a pipeline.",

@@ -15,6 +15,7 @@ import (
 // fields default to "endpoint absent": the test server returns 404, which
 // exercises the WARN/ERROR branches of the corresponding subcheck.
 type healthMock struct {
+	apiJSONStatus    int // non-zero overrides the 200 on /api/json
 	jenkinsHeader    string
 	dateHeader       string
 	meJSON           string
@@ -35,6 +36,14 @@ func newHealthDeps(t *testing.T, m healthMock) (Deps, *httptest.Server) {
 			}
 			if m.dateHeader != "" {
 				w.Header().Set("Date", m.dateHeader)
+			} else {
+				// net/http auto-injects a Date header — clear it so
+				// "missing Date" tests actually exercise that branch.
+				w.Header()["Date"] = nil
+			}
+			if m.apiJSONStatus != 0 && m.apiJSONStatus != http.StatusOK {
+				w.WriteHeader(m.apiJSONStatus)
+				return
 			}
 			_, _ = w.Write([]byte(`{"mode":"NORMAL"}`))
 		case "/me/api/json":
@@ -166,6 +175,137 @@ func TestHealthCheck_PluginManagerForbidden(t *testing.T) {
 	}
 	if !strings.Contains(out, "0 online, 1 offline") {
 		t.Errorf("expected '0 online, 1 offline', got:\n%s", out)
+	}
+}
+
+func TestHealthCheck_ReachabilityErrorOn5xx(t *testing.T) {
+	// The probe that exists specifically for "agent can't see Jenkins":
+	// /api/json returning 5xx must surface as an ERROR row, not a silent OK.
+	d, srv := newHealthDeps(t, healthMock{
+		apiJSONStatus: http.StatusBadGateway,
+		meJSON:        `{"fullName":"Alice","id":"alice"}`,
+		crumbEnabled:  true,
+		pluginsJSON:   `{"plugins":[]}`,
+		computerJSON:  `{"computer":[]}`,
+	})
+	defer srv.Close()
+
+	res, _, err := d.HealthCheck(context.Background(), nil, HealthCheckInput{})
+	if err != nil {
+		t.Fatalf("HealthCheck: %v", err)
+	}
+	out := resultText(t, res)
+
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "Jenkins reachable") {
+			if !strings.Contains(line, "ERROR") {
+				t.Errorf("expected ERROR on Jenkins reachable for 502, got: %q", line)
+			}
+			if !strings.Contains(line, "HTTP 502") {
+				t.Errorf("expected status-coded detail, got: %q", line)
+			}
+			return
+		}
+	}
+	t.Errorf("Jenkins reachable row missing entirely:\n%s", out)
+}
+
+func TestHealthCheck_AuthErrorOn401(t *testing.T) {
+	// Token misconfig is the most common failure this tool diagnoses.
+	d, srv := newHealthDeps(t, healthMock{
+		jenkinsHeader: "2.426.3",
+		meStatus:      http.StatusUnauthorized,
+		crumbEnabled:  true,
+		pluginsJSON:   `{"plugins":[]}`,
+		computerJSON:  `{"computer":[]}`,
+	})
+	defer srv.Close()
+
+	res, _, err := d.HealthCheck(context.Background(), nil, HealthCheckInput{})
+	if err != nil {
+		t.Fatalf("HealthCheck: %v", err)
+	}
+	out := resultText(t, res)
+
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "Authenticated") {
+			if !strings.Contains(line, "ERROR") {
+				t.Errorf("expected ERROR on Authenticated for 401, got: %q", line)
+			}
+			if !strings.Contains(line, "HTTP 401") {
+				t.Errorf("expected status-coded detail, got: %q", line)
+			}
+			return
+		}
+	}
+	t.Errorf("Authenticated row missing entirely:\n%s", out)
+}
+
+func TestHealthCheck_NoDateHeaderSkipsClockSkew(t *testing.T) {
+	// When the server doesn't send a Date header, the Clock skew row is
+	// silently omitted. Guard against a future refactor that would emit a
+	// bogus skew computed against a zero-value time.
+	d, srv := newHealthDeps(t, healthMock{
+		jenkinsHeader: "2.426.3",
+		// dateHeader intentionally empty.
+		meJSON:       `{"fullName":"Alice","id":"alice"}`,
+		crumbEnabled: true,
+		pluginsJSON: `{"plugins":[
+			{"shortName":"workflow-aggregator","active":true,"version":"600.v"},
+			{"shortName":"junit","active":true,"version":"1234.v"}
+		]}`,
+		computerJSON: `{"computer":[{"offline":false,"temporarilyOffline":false}]}`,
+	})
+	defer srv.Close()
+
+	res, _, err := d.HealthCheck(context.Background(), nil, HealthCheckInput{})
+	if err != nil {
+		t.Fatalf("HealthCheck: %v", err)
+	}
+	out := resultText(t, res)
+
+	if strings.Contains(out, "Clock skew") {
+		t.Errorf("did not expect Clock skew row when Date header is absent, got:\n%s", out)
+	}
+}
+
+func TestHealthCheck_ClockSkewOKWithinThreshold(t *testing.T) {
+	// 5s difference is well under the 60s warn threshold — must be OK, not
+	// WARN. Guards against an inverted boundary comparison.
+	d, srv := newHealthDeps(t, healthMock{
+		jenkinsHeader: "2.426.3",
+		dateHeader:    time.Now().UTC().Add(-5 * time.Second).Format(http.TimeFormat),
+		meJSON:        `{"fullName":"Alice","id":"alice"}`,
+		crumbEnabled:  true,
+		pluginsJSON: `{"plugins":[
+			{"shortName":"workflow-aggregator","active":true,"version":"600.v"},
+			{"shortName":"junit","active":true,"version":"1234.v"}
+		]}`,
+		computerJSON: `{"computer":[{"offline":false,"temporarilyOffline":false}]}`,
+	})
+	defer srv.Close()
+
+	res, _, err := d.HealthCheck(context.Background(), nil, HealthCheckInput{})
+	if err != nil {
+		t.Fatalf("HealthCheck: %v", err)
+	}
+	out := resultText(t, res)
+
+	var skewLine string
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "Clock skew") {
+			skewLine = line
+			break
+		}
+	}
+	if skewLine == "" {
+		t.Fatalf("expected Clock skew row, got:\n%s", out)
+	}
+	if !strings.Contains(skewLine, "OK") {
+		t.Errorf("expected OK for 5s skew, got: %q", skewLine)
+	}
+	if strings.Contains(skewLine, "WARN") {
+		t.Errorf("did not expect WARN for 5s skew, got: %q", skewLine)
 	}
 }
 
