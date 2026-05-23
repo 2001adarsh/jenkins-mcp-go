@@ -138,6 +138,15 @@ func run() error {
 	}, deps.GetBuildInfo)
 
 	mcp.AddTool(srv, &mcp.Tool{
+		Name: "get_scm_context",
+		Description: "Return the per-commit change history for one build: commit id, author, " +
+			"timestamp, message subject, and each commit's touched paths with a single-letter edit " +
+			"code (A/M/D). Pipeline builds may produce multiple change sets (one per checkout step); " +
+			"they are flattened in order with a per-set header. Optional path_filter (case-insensitive " +
+			"RE2) narrows to commits that touch a matching path; max_commits caps rendering (default 50).",
+	}, deps.GetSCMContext)
+
+	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "search_console_log",
 		Description: "Regex-search (RE2) a Jenkins build's console log and return matches with surrounding context.",
 	}, deps.SearchConsoleLog)

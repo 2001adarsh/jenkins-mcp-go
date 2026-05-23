@@ -56,6 +56,7 @@ console log without re-downloading it on every question.
 | `get_console_log_path` | Force-cache the full log for a completed build and return its on-disk path so the agent can `Read`/`Grep`/`Bash` it natively. |
 | `search_console_log` | RE2 regex search over the console log with line-number-aware context windows. |
 | `get_build_info` | Pretty-printed build summary: result, duration, parameters, change set. |
+| `get_scm_context` | Per-commit history for one build: commit id, author, timestamp, message subject, and each commit's touched paths with `A`/`M`/`D` edit codes. Pipeline change sets are flattened with per-set headers. Optional RE2 `path_filter`. |
 | `get_pipeline_stages` | List Declarative/Scripted Pipeline stages via `/wfapi/describe` with status and duration. |
 | `get_stage_log` | Fetch a single pipeline stage's log via `/execution/node/<id>/wfapi/log`. |
 | `get_test_report` | Structured JUnit results from `/testReport/api/json`, with failed cases and head+tail of stack traces. |
