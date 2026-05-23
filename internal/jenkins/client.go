@@ -82,9 +82,21 @@ func NewClient(cfg Config) (*Client, error) {
 // and returns the response body. Non-2xx responses are returned as errors with
 // a short body snippet for context.
 func (c *Client) Get(ctx context.Context, path string, query map[string]string) ([]byte, error) {
+	body, _, err := c.doGet(ctx, path, query)
+	return body, err
+}
+
+// GetWithHeaders is like Get but also returns the response headers. Use it
+// for endpoints whose useful information lives in a header (e.g. the
+// X-Jenkins version banner on /api/json).
+func (c *Client) GetWithHeaders(ctx context.Context, path string, query map[string]string) ([]byte, http.Header, error) {
+	return c.doGet(ctx, path, query)
+}
+
+func (c *Client) doGet(ctx context.Context, path string, query map[string]string) ([]byte, http.Header, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if len(query) > 0 {
 		q := req.URL.Query()
@@ -99,13 +111,13 @@ func (c *Client) Get(ctx context.Context, path string, query map[string]string) 
 	resp, err := c.http.Do(req)
 	if err != nil {
 		debugf("err  GET %s after %s: %v", req.URL.Path, time.Since(start), err)
-		return nil, err
+		return nil, nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		debugf("err  GET %s read body after %s: %v", req.URL.Path, time.Since(start), err)
-		return nil, err
+		return nil, nil, err
 	}
 	debugf("resp %d GET %s in %s (%d bytes)", resp.StatusCode, req.URL.Path, time.Since(start), len(body))
 	if resp.StatusCode/100 != 2 {
@@ -113,9 +125,9 @@ func (c *Client) Get(ctx context.Context, path string, query map[string]string) 
 		if len(snippet) > 300 {
 			snippet = snippet[:300] + "..."
 		}
-		return nil, fmt.Errorf("jenkins %s returned HTTP %d: %s", req.URL.Path, resp.StatusCode, snippet)
+		return nil, nil, fmt.Errorf("jenkins %s returned HTTP %d: %s", req.URL.Path, resp.StatusCode, snippet)
 	}
-	return body, nil
+	return body, resp.Header, nil
 }
 
 // Post issues an authenticated POST. When form is non-nil, the body is

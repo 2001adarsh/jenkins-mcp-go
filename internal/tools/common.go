@@ -6,6 +6,7 @@ package tools
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -16,6 +17,18 @@ import (
 type Deps struct {
 	Client *jenkins.Client
 	Cache  *jenkins.ConsoleCache
+	Config EffectiveConfig
+}
+
+// EffectiveConfig is a read-only snapshot of the runtime configuration the
+// process resolved at startup. It is surfaced by health_check so users can
+// confirm what the server is actually running with.
+type EffectiveConfig struct {
+	Version  string
+	ReadOnly bool
+	CacheDir string
+	CacheMax int64
+	Timeout  time.Duration
 }
 
 // textResult wraps a string as an mcp.CallToolResult.

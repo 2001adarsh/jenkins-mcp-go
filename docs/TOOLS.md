@@ -22,6 +22,29 @@ discovery tool — it takes a `folder_path` in the same slash-separated form
 
 ---
 
+## `health_check`
+
+Run a fixed battery of read-only probes against the configured Jenkins and
+return a one-line-per-check report. Use this to validate a fresh install or
+to debug "the agent says it can't see Jenkins".
+
+No inputs.
+
+Checks (each row is independently labelled `OK` / `WARN` / `ERROR`):
+
+- **Jenkins reachable** — the `X-Jenkins` header version on `/api/json`.
+- **Authenticated** — the user resolved from `/me/api/json`.
+- **CSRF crumb issuer** — `enabled`, or `disabled` (HTTP 404 from
+  `/crumbIssuer/api/json`) which downgrades POSTs to crumb-less.
+- **Pipeline plugin / JUnit plugin** — presence and active flag from
+  `/pluginManager/api/json`. Non-admin tokens that 403 on this endpoint
+  surface as WARN (`plugin status unknown`), not ERROR.
+- **Nodes** — online / offline counts from `/computer/api/json`.
+- **Clock skew** — server `Date` header vs local clock, WARN above 60s.
+
+Trailing **Effective configuration** block lists the version, read-only mode,
+cache dir, cache max bytes, and HTTP timeout the process resolved at startup.
+
 ## `list_jobs`
 
 Enumerate jobs and folders under `folder_path` (root when empty). Use this
