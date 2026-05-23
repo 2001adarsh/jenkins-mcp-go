@@ -216,80 +216,26 @@ Once the server is registered, ask your agent things like:
   → calls `get_console_log_path`; the agent then uses its own `Read`/`Grep`/`Bash`
   tools on the returned path.
 
-## How caching works
+## Caching
 
-- Only **finished** builds are cached. The cache writer requires Jenkins'
-  `Finished: <result>` marker in the response body, so an in-flight build can
-  never be persisted as if it were complete.
-- Files are named `<sanitized-job-path>-<build-number>.log` in
-  `JENKINS_MCP_CACHE_DIR`. The slug is sanitized so directory-traversal
-  attempts can't escape the cache root.
-- Whenever a cached file is read, its mtime is bumped — this gives LRU
-  eviction by access time.
-- After a successful write, if total cache size exceeds
-  `JENKINS_MCP_CACHE_MAX`, the oldest-mtime files are deleted until the cap
-  is satisfied.
-
-## Architecture
-
-```
-cmd entrypoint
-└─ main.go                      env → config, wire up server, register tools
-
-internal/jenkins/
-├─ client.go                    HTTP client (Basic auth, single base URL)
-└─ cache.go                     finished-build console log cache + LRU eviction
-
-internal/tools/
-├─ common.go                    Deps struct, shared response helpers
-├─ health.go                    health_check
-├─ jobs.go                      list_jobs
-├─ branches.go                  list_branches
-├─ console.go                   get_console_log, get_console_log_path, search_console_log
-├─ build.go                     get_build_info
-├─ scm.go                       get_scm_context
-├─ compare.go                   compare_builds
-├─ pipeline.go                  get_pipeline_stages, get_stage_log
-├─ testreport.go                get_test_report
-├─ flaky.go                     get_flaky_candidates
-├─ junit_status.go              shared JUnit status normalization
-├─ failures.go                  get_failure_summary (Ginkgo)
-├─ nodes.go                     list_nodes, get_node
-├─ queue.go                     list_queue, cancel_queue_item
-└─ lifecycle.go                 trigger_build, stop_build
-```
-
-`internal/` is intentionally not importable by external modules; the public
-surface of this repository is the binary.
+Only finished builds are cached (the writer requires Jenkins' `Finished:`
+marker), and the cache is evicted by LRU mtime once it exceeds
+`JENKINS_MCP_CACHE_MAX`. Files live in `JENKINS_MCP_CACHE_DIR`.
 
 ## Security notes
 
-- **Mutations are opt-out.** Read tools issue only `GET`. Write tools
-  (`cancel_queue_item`, etc.) use `POST` with a CSRF crumb and are
-  suppressed entirely when `JENKINS_MCP_READONLY` is truthy.
-- **One host, one credential.** Credentials come from the environment and are
-  used only against `JENKINS_URL`. There is no host argument on any tool.
 - **No credential echo.** The server never includes credentials in tool
   output, error messages, or cached files.
-- **Filesystem boundary.** Cache filenames are deterministic and sanitized;
-  the cache directory is the only path the server writes to.
+- **Filesystem boundary.** Cache filenames are sanitized; the cache
+  directory is the only path the server writes to.
 
 If you find a security issue, please follow [SECURITY.md](SECURITY.md) rather
 than opening a public issue.
 
 ## Development
 
-```sh
-make build      # compile to ./bin/jenkins-mcp
-make test       # go test ./...
-make lint       # golangci-lint run (requires golangci-lint installed)
-make fmt        # gofmt -s -w + go mod tidy
-make clean
-```
-
-Open a topic branch off `main`, keep commits focused, and run `make test lint`
-before opening a PR. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full
-contributor guide and [`docs/DEBUGGING.md`](docs/DEBUGGING.md) for how to
+`make build / test / lint / fmt`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
+full contributor guide and [`docs/DEBUGGING.md`](docs/DEBUGGING.md) for how to
 exercise the server locally with MCP Inspector.
 
 ## Compatibility
