@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -22,7 +23,9 @@ const compareBuildTree = "result,duration," +
 
 // compareTestsTree keeps the test-case payload to identity + status —
 // stack traces are not needed for a diff and would explode on large suites.
-const compareTestsTree = "failCount,passCount,skipCount,suites[cases[className,name,status]]"
+// Counts (failCount/passCount/skipCount) are not requested because the
+// renderer reads only the suites payload.
+const compareTestsTree = "suites[cases[className,name,status]]"
 
 // compareTestsBucketCap caps how many test names render per bucket. The
 // counts above the list are exact; only the printed list is truncated.
@@ -77,13 +80,30 @@ func (d Deps) CompareBuilds(ctx context.Context, _ *mcp.CallToolRequest, in Comp
 		includeTests = *in.IncludeTests
 	}
 
-	snapA, err := d.loadCompareSnapshot(ctx, in.JobPath, in.BuildA, includeTests)
-	if err != nil {
-		return nil, nil, err
+	// Load A and B in parallel — each snapshot is 1–3 sequential HTTP
+	// calls (info + stages + tests), so two goroutines roughly halve wall
+	// time. If one side errors, the other's in-flight calls share the
+	// caller's ctx and complete naturally; the wasted work is bounded.
+	var (
+		snapA, snapB *compareSnapshot
+		errA, errB   error
+		wg           sync.WaitGroup
+	)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		snapA, errA = d.loadCompareSnapshot(ctx, in.JobPath, in.BuildA, includeTests)
+	}()
+	go func() {
+		defer wg.Done()
+		snapB, errB = d.loadCompareSnapshot(ctx, in.JobPath, in.BuildB, includeTests)
+	}()
+	wg.Wait()
+	if errA != nil {
+		return nil, nil, errA
 	}
-	snapB, err := d.loadCompareSnapshot(ctx, in.JobPath, in.BuildB, includeTests)
-	if err != nil {
-		return nil, nil, err
+	if errB != nil {
+		return nil, nil, errB
 	}
 
 	var out strings.Builder
