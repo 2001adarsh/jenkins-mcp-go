@@ -124,8 +124,8 @@ func (d Deps) ListBranches(ctx context.Context, _ *mcp.CallToolRequest, in ListB
 				builtAt = time.UnixMilli(j.LastBuild.Timestamp).UTC().Format(time.RFC3339)
 			}
 		}
-		fmt.Fprintf(&out, "%-30s  %-7s  %-9s  %-10s  %-20s  %s\n",
-			truncate(j.Name, 30), lastNum, result, duration, builtAt, j.URL)
+		fmt.Fprintf(&out, "%s  %-7s  %-9s  %-10s  %-20s  %s\n",
+			padRight(truncate(j.Name, 30), 30), lastNum, result, duration, builtAt, j.URL)
 	}
 	return textResult(out.String()), nil, nil
 }

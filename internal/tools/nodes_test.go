@@ -96,3 +96,77 @@ func TestGetNode_RequiresName(t *testing.T) {
 		t.Fatal("expected error when name is empty")
 	}
 }
+
+func TestTruncate(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		n    int
+		want string
+	}{
+		{"shorter passes through", "hello", 30, "hello"},
+		{"exact length passes through", "abcde", 5, "abcde"},
+		{"longer ASCII truncates with ellipsis", strings.Repeat("a", 40), 30,
+			strings.Repeat("a", 29) + "…"},
+		{"multi-byte content counted by rune, not byte", "日本語テスト", 4, "日本語…"},
+		{"multi-byte under limit passes through", "日本語", 5, "日本語"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := truncate(tc.in, tc.n)
+			if got != tc.want {
+				t.Errorf("truncate(%q, %d) = %q, want %q", tc.in, tc.n, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPadRight(t *testing.T) {
+	// Helper: count runes, not bytes — that's the whole point of the function.
+	runeWidth := func(s string) int {
+		n := 0
+		for range s {
+			n++
+		}
+		return n
+	}
+
+	cases := []struct {
+		name  string
+		in    string
+		width int
+		want  int // expected rune width of result
+	}{
+		{"shorter pads to width", "abc", 10, 10},
+		{"exact width unchanged", "abcde", 5, 5},
+		{"longer than width unchanged (no clip)", "abcdefghij", 5, 10},
+		{"multi-byte input padded by rune count", "日本語", 6, 6},
+		{"truncated input ending in ellipsis pads correctly",
+			truncate(strings.Repeat("a", 40), 30), 30, 30},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := padRight(tc.in, tc.width)
+			if w := runeWidth(got); w != tc.want {
+				t.Errorf("padRight(%q, %d) rune width = %d, want %d (result %q)",
+					tc.in, tc.width, w, tc.want, got)
+			}
+		})
+	}
+}
+
+func TestTruncatePadComposition_FixesColumnAlignment(t *testing.T) {
+	// Regression for the issue this fix closes: a 40-byte ASCII name
+	// truncated to 30 produced 32 bytes (29 ASCII + 3-byte "…"); when
+	// formatted with %-30s, the column got no padding because fmt counts
+	// bytes. padRight(truncate(...), 30) must yield exactly 30 runes.
+	name := strings.Repeat("a", 40)
+	cell := padRight(truncate(name, 30), 30)
+	runes := 0
+	for range cell {
+		runes++
+	}
+	if runes != 30 {
+		t.Errorf("composed cell rune width = %d, want 30", runes)
+	}
+}
