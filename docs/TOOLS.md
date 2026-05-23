@@ -146,6 +146,43 @@ A top-level `Culprits: …` line is included when Jenkins reports culprits
 for the build. Builds with no SCM changes render `(no commits in change
 set)`.
 
+## `compare_builds`
+
+Diff two builds of the same job. Use this to answer "build B failed but A
+passed — what changed?" in a single call instead of fanning out across
+`get_build_info`, `get_pipeline_stages`, `get_test_report`, and
+`get_scm_context` twice each.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `job_path` | string | yes | — | Slash-separated job path. |
+| `build_a` | integer | yes | — | Older / baseline build number. Must be `> 0`; `lastBuild` is not accepted. |
+| `build_b` | integer | yes | — | Newer / candidate build number. Must be `> 0` and different from `build_a`. |
+| `include_tests` | bool | no | `true` | Set false to skip the per-test diff on large suites (saves one `/testReport/api/json` call per build). |
+
+The SCM diff is **direct**: commits in `build_b`'s change set whose
+`commitId` is not in `build_a`'s change set. Intermediate builds between A
+and B are not walked. For closely-spaced builds this is the same as the
+full delta; for builds far apart, expect only B's own change set to render
+under the SCM section.
+
+Output sections (in order):
+
+- **Header**: `Result: A → B`, `Duration: A → B (Δ ±t)`.
+- **Parameters**: `+`, `-`, and `~` (changed) lines. Unchanged parameters
+  are omitted.
+- **SCM**: commits in B-but-not-A.
+- **Stages (changed only)**: stages whose status flipped, plus stages
+  present in only one build (renamed pipelines).
+- **Tests**: four buckets — `pass → fail`, `fail → pass`, `new`,
+  `removed` — capped at 100 names each (counts above the lists are exact).
+  New tests carry an inline `[PASSED]`/`[FAILED]` annotation since the
+  bucket itself mixes statuses.
+
+If either build is missing pipeline data (HTTP 404 on `/wfapi/describe`)
+or test data (HTTP 404 on `/testReport/api/json`), the affected section
+renders a hint instead of failing the whole comparison.
+
 ## `search_console_log`
 
 Run a Go `regexp` (RE2 syntax) over the console log and return matches with

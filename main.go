@@ -147,6 +147,15 @@ func run() error {
 	}, deps.GetSCMContext)
 
 	mcp.AddTool(srv, &mcp.Tool{
+		Name: "compare_builds",
+		Description: "Diff two builds of the same job across result, duration, parameters, SCM " +
+			"commits, pipeline stages, and JUnit tests. Inputs are explicit build numbers (build_a, " +
+			"build_b — lastBuild not accepted). SCM diff is direct (commits in build_b's change set " +
+			"not in build_a's); intermediate builds are not walked. Set include_tests=false to skip " +
+			"the per-test diff on large suites.",
+	}, deps.CompareBuilds)
+
+	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "search_console_log",
 		Description: "Regex-search (RE2) a Jenkins build's console log and return matches with surrounding context.",
 	}, deps.SearchConsoleLog)

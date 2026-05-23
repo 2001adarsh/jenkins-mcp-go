@@ -7,6 +7,7 @@ package tools
 import (
 	"fmt"
 	"regexp"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -41,6 +42,12 @@ func compileFilter(paramName, expr string) (*regexp.Regexp, error) {
 		return nil, fmt.Errorf("invalid %s: %w", paramName, err)
 	}
 	return re, nil
+}
+
+// formatBuildDuration renders Jenkins' millisecond duration as a compact
+// Go-style string truncated to whole seconds (e.g. "2m15s", "1h2m3s").
+func formatBuildDuration(millis int64) string {
+	return (time.Duration(millis) * time.Millisecond).Truncate(time.Second).String()
 }
 
 // pathFooter formats the trailing breadcrumb that points callers at the

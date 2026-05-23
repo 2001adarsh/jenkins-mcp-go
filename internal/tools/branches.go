@@ -125,12 +125,6 @@ func (d Deps) ListBranches(ctx context.Context, _ *mcp.CallToolRequest, in ListB
 	return textResult(out.String()), nil, nil
 }
 
-// formatBuildDuration renders Jenkins' millisecond duration as a compact
-// Go-style string truncated to whole seconds (e.g. "2m15s", "1h2m3s").
-func formatBuildDuration(millis int64) string {
-	return (time.Duration(millis) * time.Millisecond).Truncate(time.Second).String()
-}
-
 // shortClass strips the Jenkins-internal package prefix from a _class value
 // so error messages stay readable. Empty class is reported as unknown rather
 // than as an empty token in the rendered hint.
