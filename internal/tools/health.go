@@ -95,7 +95,7 @@ func (d Deps) HealthCheck(ctx context.Context, _ *mcp.CallToolRequest, _ HealthC
 		rows = append(rows, checkClockSkew(serverDate))
 	}
 
-	return textResult(renderHealth(rows, d.Config)), nil, nil
+	return textResult(renderHealth(rows, d)), nil, nil
 }
 
 func checkAuth(ctx context.Context, c *jenkins.Client) healthRow {
@@ -244,32 +244,22 @@ func formatSkew(d time.Duration) string {
 	return fmt.Sprintf("server is %s ahead of local time", abs)
 }
 
-func renderHealth(rows []healthRow, cfg EffectiveConfig) string {
+func renderHealth(rows []healthRow, d Deps) string {
 	var out strings.Builder
 	out.WriteString("Jenkins MCP health check\n\n")
 	for _, r := range rows {
 		fmt.Fprintf(&out, "  [%s] %-20s  %s\n", r.Status, r.Name, r.Detail)
 	}
-	out.WriteString("\nEffective configuration\n")
-	fmt.Fprintf(&out, "  jenkins-mcp version: %s\n", orDefault(cfg.Version, "dev"))
-	fmt.Fprintf(&out, "  read-only mode:      %v\n", cfg.ReadOnly)
-	fmt.Fprintf(&out, "  cache dir:           %s\n", orDefault(cfg.CacheDir, "(unset)"))
-	if cfg.CacheMax > 0 {
-		fmt.Fprintf(&out, "  cache max bytes:     %d\n", cfg.CacheMax)
-	} else {
-		fmt.Fprintf(&out, "  cache max bytes:     (default)\n")
-	}
-	if cfg.Timeout > 0 {
-		fmt.Fprintf(&out, "  http timeout:        %s\n", cfg.Timeout)
-	} else {
-		fmt.Fprintf(&out, "  http timeout:        (default)\n")
-	}
-	return out.String()
-}
 
-func orDefault(s, def string) string {
-	if s == "" {
-		return def
+	version := d.Version
+	if version == "" {
+		version = "dev"
 	}
-	return s
+	out.WriteString("\nEffective configuration\n")
+	fmt.Fprintf(&out, "  jenkins-mcp version: %s\n", version)
+	fmt.Fprintf(&out, "  read-only mode:      %v\n", d.ReadOnly)
+	fmt.Fprintf(&out, "  cache dir:           %s\n", d.Cache.Dir)
+	fmt.Fprintf(&out, "  cache max bytes:     %d\n", d.Cache.MaxBytes)
+	fmt.Fprintf(&out, "  http timeout:        %s\n", d.Client.Timeout())
+	return out.String()
 }

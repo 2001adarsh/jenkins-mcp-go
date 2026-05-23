@@ -85,6 +85,11 @@ type Config struct {
 	Timeout time.Duration
 }
 
+// Timeout returns the HTTP client timeout the Jenkins client is using.
+// Useful for tools that want to surface the effective timeout (e.g.
+// health_check) without snapshotting it elsewhere at startup.
+func (c *Client) Timeout() time.Duration { return c.http.Timeout }
+
 // NewClient validates the configuration and returns a ready-to-use Client.
 //
 // BaseURL trailing slashes are trimmed so callers can join paths starting with

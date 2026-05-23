@@ -42,8 +42,10 @@ Checks (each row is independently labelled `OK` / `WARN` / `ERROR`):
 - **Nodes** — online / offline counts from `/computer/api/json`.
 - **Clock skew** — server `Date` header vs local clock, WARN above 60s.
 
-Trailing **Effective configuration** block lists the version, read-only mode,
-cache dir, cache max bytes, and HTTP timeout the process resolved at startup.
+Trailing **Effective configuration** block reads from each value's natural
+home — `d.Cache.Dir` / `d.Cache.MaxBytes` for the cache, `d.Client.Timeout()`
+for the HTTP timeout, plus the server-policy fields (binary version, read-only
+mode) the process resolved at startup.
 
 ## `list_jobs`
 

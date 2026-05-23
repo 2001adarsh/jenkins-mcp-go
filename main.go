@@ -77,15 +77,10 @@ func run() error {
 	}
 
 	deps := tools.Deps{
-		Client: client,
-		Cache:  cache,
-		Config: tools.EffectiveConfig{
-			Version:  version,
-			ReadOnly: cfg.ReadOnly,
-			CacheDir: cfg.CacheDir,
-			CacheMax: cfg.CacheMax,
-			Timeout:  cfg.Timeout,
-		},
+		Client:   client,
+		Cache:    cache,
+		Version:  version,
+		ReadOnly: cfg.ReadOnly,
 	}
 
 	srv := mcp.NewServer(&mcp.Implementation{

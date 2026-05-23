@@ -75,8 +75,10 @@ func newHealthDeps(t *testing.T, m healthMock) (Deps, *httptest.Server) {
 		t.Fatalf("NewClient: %v", err)
 	}
 	return Deps{
-		Client: cli,
-		Config: EffectiveConfig{Version: "v1.2.3", ReadOnly: true, CacheDir: "/tmp/x"},
+		Client:   cli,
+		Cache:    &jenkins.ConsoleCache{Dir: "/tmp/x", MaxBytes: 0},
+		Version:  "v1.2.3",
+		ReadOnly: true,
 	}, srv
 }
 

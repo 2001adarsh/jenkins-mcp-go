@@ -6,7 +6,6 @@ package tools
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -14,21 +13,16 @@ import (
 )
 
 // Deps is the shared dependency set passed to every tool handler.
+//
+// Version and ReadOnly are server-policy values that don't belong on the
+// Jenkins client or the cache. Everything else a tool needs (cache dir/cap,
+// HTTP timeout) is read from its natural home — d.Cache.* or
+// d.Client.Timeout() — at use time, not snapshotted.
 type Deps struct {
-	Client *jenkins.Client
-	Cache  *jenkins.ConsoleCache
-	Config EffectiveConfig
-}
-
-// EffectiveConfig is a read-only snapshot of the runtime configuration the
-// process resolved at startup. It is surfaced by health_check so users can
-// confirm what the server is actually running with.
-type EffectiveConfig struct {
+	Client   *jenkins.Client
+	Cache    *jenkins.ConsoleCache
 	Version  string
 	ReadOnly bool
-	CacheDir string
-	CacheMax int64
-	Timeout  time.Duration
 }
 
 // textResult wraps a string as an mcp.CallToolResult.
