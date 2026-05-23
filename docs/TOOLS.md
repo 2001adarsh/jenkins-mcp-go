@@ -117,6 +117,35 @@ everything that came before.
 | `job_path` | string | yes | — | Slash-separated job path. |
 | `build_number` | integer | yes | — | Must be `> 0`. Only completed, immutable builds are cached. |
 
+## `get_scm_context`
+
+Return the per-commit change history for one build: commit id, author,
+timestamp, message subject, and each commit's touched paths with a
+single-letter edit code (`A` add, `M` edit/modify, `D` delete; other plugin
+edit-type strings fall back to their upper-cased first letter). Pipeline
+builds may produce multiple change sets (one per `checkout` step); they are
+flattened in order with a per-set header.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `job_path` | string | yes | — | Slash-separated job path. |
+| `build_number` | integer | no | `0` | Build number. `0` = `lastBuild`. |
+| `max_commits` | integer | no | `50` | Cap commits rendered; a footer notes when the cap is hit. |
+| `path_filter` | string | no | — | Case-insensitive RE2 regex; only commits touching a matching path are returned. |
+
+Each commit renders as a header line followed by one indented line per
+touched file:
+
+```
+abc1234 alice 2026-05-16 12:04  "Fix flake in PaymentSpec"
+  M  internal/payment/processor.go
+  A  internal/payment/processor_test.go
+```
+
+A top-level `Culprits: …` line is included when Jenkins reports culprits
+for the build. Builds with no SCM changes render `(no commits in change
+set)`.
+
 ## `search_console_log`
 
 Run a Go `regexp` (RE2 syntax) over the console log and return matches with

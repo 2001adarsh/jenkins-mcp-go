@@ -6,6 +6,7 @@ package tools
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -25,6 +26,21 @@ func textResult(text string) *mcp.CallToolResult {
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: text}},
 	}
+}
+
+// compileFilter compiles a case-insensitive RE2 regex used by the *_filter
+// tool inputs. Returns (nil, nil) when expr is empty so callers can guard
+// with a plain nil check. paramName is the JSON field name and is woven
+// into the error so the caller sees which filter failed to parse.
+func compileFilter(paramName, expr string) (*regexp.Regexp, error) {
+	if expr == "" {
+		return nil, nil
+	}
+	re, err := regexp.Compile("(?i)" + expr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid %s: %w", paramName, err)
+	}
+	return re, nil
 }
 
 // pathFooter formats the trailing breadcrumb that points callers at the

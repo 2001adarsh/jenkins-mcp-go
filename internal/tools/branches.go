@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
@@ -52,13 +51,9 @@ func (d Deps) ListBranches(ctx context.Context, _ *mcp.CallToolRequest, in ListB
 		return nil, nil, fmt.Errorf("job_path is required")
 	}
 
-	var nameRe *regexp.Regexp
-	if in.NameFilter != "" {
-		re, err := regexp.Compile("(?i)" + in.NameFilter)
-		if err != nil {
-			return nil, nil, fmt.Errorf("invalid name_filter: %w", err)
-		}
-		nameRe = re
+	nameRe, err := compileFilter("name_filter", in.NameFilter)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	apiPath := jenkins.JobAPIPath(in.JobPath) + "/api/json"
