@@ -175,6 +175,14 @@ func run() error {
 	}, deps.GetTestReport)
 
 	mcp.AddTool(srv, &mcp.Tool{
+		Name: "get_flaky_candidates",
+		Description: "Rank flaky tests across the latest sample_size completed builds of one job " +
+			"by counting pass↔fail flips. Output is a sorted table of test name, flip count, " +
+			"pass/fail tallies, and last_seen_build. Defaults: sample_size=20 (cap 50), min_flips=2, " +
+			"include_skipped=false (SKIPPED ignored; set true to count SKIP as a state).",
+	}, deps.GetFlakyCandidates)
+
+	mcp.AddTool(srv, &mcp.Tool{
 		Name: "get_pipeline_stages",
 		Description: "List Declarative/Scripted Pipeline stages for a build with status and " +
 			"duration via /wfapi/describe. Use this first to find which stage failed before " +

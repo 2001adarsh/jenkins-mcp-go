@@ -61,6 +61,7 @@ console log without re-downloading it on every question.
 | `get_pipeline_stages` | List Declarative/Scripted Pipeline stages via `/wfapi/describe` with status and duration. |
 | `get_stage_log` | Fetch a single pipeline stage's log via `/execution/node/<id>/wfapi/log`. |
 | `get_test_report` | Structured JUnit results from `/testReport/api/json`, with failed cases and head+tail of stack traces. |
+| `get_flaky_candidates` | Rank flaky tests across the latest N completed builds of one job by counting pass↔fail flips. Returns a sorted table of test name, flip count, pass/fail tallies, and last-seen build. |
 | `get_failure_summary` | Parse Ginkgo's `Summarizing N Failure` block and surface the first `[ERROR]` tagged with each spec name. |
 | `list_nodes` | List Jenkins agents/nodes with status, executor counts, labels, and monitor summaries. |
 | `get_node` | Per-node detail: status, per-executor idle state, labels, full monitor data. |
