@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -66,8 +67,8 @@ func (d Deps) ListNodes(ctx context.Context, _ *mcp.CallToolRequest, _ struct{})
 	fmt.Fprintf(&out, "%-3s  %-30s  %-9s  %-3s  %-6s  %s\n",
 		"---", "------------------------------", "---------", "---", "------", "------")
 	for i, c := range listing.Computer {
-		fmt.Fprintf(&out, "%-3d  %-30s  %-9s  %-3d  %-6s  %s\n",
-			i+1, truncate(c.DisplayName, 30), nodeStatus(c), c.NumExecutors,
+		fmt.Fprintf(&out, "%-3d  %s  %-9s  %-3d  %-6s  %s\n",
+			i+1, padRight(truncate(c.DisplayName, 30), 30), nodeStatus(c), c.NumExecutors,
 			fmt.Sprintf("%v", c.Idle), labelNames(c.AssignedLabels))
 	}
 
@@ -191,9 +192,25 @@ func formatMonitorData(m map[string]any) []string {
 	return out
 }
 
+// truncate shortens s to at most n runes, replacing the trailing rune with
+// "…" when truncation happens. Rune-aware so it never splits a multi-byte
+// codepoint and so callers get a predictable display width.
 func truncate(s string, n int) string {
-	if len(s) <= n {
+	runes := []rune(s)
+	if len(runes) <= n {
 		return s
 	}
-	return s[:n-1] + "…"
+	return string(runes[:n-1]) + "…"
+}
+
+// padRight pads s with spaces on the right so its rune-counted width
+// equals width. Use this for tabular columns whose contents may include
+// multi-byte runes — Go's %-Ns format pads by byte count, which under-pads
+// non-ASCII or the "…" returned by truncate.
+func padRight(s string, width int) string {
+	n := utf8.RuneCountInString(s)
+	if n >= width {
+		return s
+	}
+	return s + strings.Repeat(" ", width-n)
 }
