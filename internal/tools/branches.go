@@ -149,7 +149,6 @@ func shortClass(c string) string {
 	return c
 }
 
-// lastSegment returns the trailing path component of a slash-separated path.
 func lastSegment(p string) string {
 	p = strings.Trim(p, "/")
 	if slash := strings.LastIndex(p, "/"); slash >= 0 {
