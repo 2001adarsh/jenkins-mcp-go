@@ -105,6 +105,25 @@ go install github.com/2001adarsh/jenkins-mcp-go@latest
 
 The binary lands in `$(go env GOBIN)` (or `$(go env GOPATH)/bin`).
 
+### Via Docker
+
+Pre-built multi-arch images are published to GitHub Container Registry:
+
+```sh
+docker pull ghcr.io/2001adarsh/jenkins-mcp-go:latest
+```
+
+Tags:
+
+- `:latest` — most recent release
+- `:vX.Y.Z` — pinned to a specific release
+- `:vX.Y.Z-amd64` / `:vX.Y.Z-arm64` — per-arch (the unsuffixed tags above are multi-arch manifests; `docker pull` resolves the right one automatically)
+
+The image is built on `gcr.io/distroless/static:nonroot` — runs as a non-root
+user, ships with CA roots so HTTPS to Jenkins works out of the box, and is
+under 20 MB compressed. See the [Docker MCP client setup](#mcp-client-setup)
+section for a `docker run`-based Claude Desktop config.
+
 ### From source
 
 ```sh
@@ -156,6 +175,40 @@ client's MCP server configuration.
   }
 }
 ```
+
+</details>
+
+<details>
+<summary><strong>Claude Desktop via Docker</strong> — same config file, no binary on PATH required</summary>
+
+```json
+{
+  "mcpServers": {
+    "jenkins": {
+      "command": "docker",
+      "args": [
+        "run", "--rm", "-i",
+        "-e", "JENKINS_URL",
+        "-e", "JENKINS_USER",
+        "-e", "JENKINS_API_TOKEN",
+        "ghcr.io/2001adarsh/jenkins-mcp-go:latest"
+      ],
+      "env": {
+        "JENKINS_URL": "https://jenkins.example.com",
+        "JENKINS_USER": "your-username",
+        "JENKINS_API_TOKEN": "your-api-token"
+      }
+    }
+  }
+}
+```
+
+`-i` keeps stdin open (MCP speaks stdio); `--rm` cleans up the container
+after Claude Desktop disconnects. The console-log cache lives inside the
+container by default, so it's lost on restart — add
+`-v "$HOME/.cache/jenkins-mcp:/home/nonroot/.cache/jenkins-mcp"` and
+`-e XDG_CACHE_HOME=/home/nonroot/.cache` to the `args` array if you want
+the cache to survive across sessions.
 
 </details>
 
