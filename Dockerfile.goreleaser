@@ -1,0 +1,10 @@
+# Built by goreleaser — see .goreleaser.yaml. The binary is produced by the
+# release pipeline and COPY'd in; this image only provides the runtime.
+FROM gcr.io/distroless/static:nonroot
+
+# distroless static:nonroot already sets USER nonroot (uid 65532) and ships
+# ca-certificates, so HTTPS to Jenkins works out of the box.
+
+COPY jenkins-mcp /jenkins-mcp
+
+ENTRYPOINT ["/jenkins-mcp"]

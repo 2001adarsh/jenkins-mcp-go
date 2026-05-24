@@ -1,0 +1,120 @@
+# See: https://goreleaser.com
+# Validate locally with: goreleaser check
+# Dry-run a release: goreleaser release --snapshot --clean --skip=publish
+version: 2
+
+project_name: jenkins-mcp
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: jenkins-mcp
+    main: .
+    binary: jenkins-mcp
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      # No real demand for windows/arm64; skip the build to keep the matrix tight.
+      - goos: windows
+        goarch: arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+      - docs/**/*
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  use: github
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: Other
+      order: 999
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - 'Merge pull request'
+
+# Per-arch images. docker_manifests below combines them into a multi-arch
+# manifest list so `docker pull ghcr.io/.../jenkins-mcp-go:<tag>` resolves
+# to the right arch automatically.
+dockers:
+  - id: linux-amd64
+    use: buildx
+    goos: linux
+    goarch: amd64
+    dockerfile: Dockerfile.goreleaser
+    image_templates:
+      - 'ghcr.io/2001adarsh/jenkins-mcp-go:{{ .Version }}-amd64'
+    build_flag_templates:
+      - --platform=linux/amd64
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.description=Jenkins MCP server
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.created={{ .Date }}
+      - --label=org.opencontainers.image.source={{ .GitURL }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+      - --label=org.opencontainers.image.licenses=MIT
+
+  - id: linux-arm64
+    use: buildx
+    goos: linux
+    goarch: arm64
+    dockerfile: Dockerfile.goreleaser
+    image_templates:
+      - 'ghcr.io/2001adarsh/jenkins-mcp-go:{{ .Version }}-arm64'
+    build_flag_templates:
+      - --platform=linux/arm64
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.description=Jenkins MCP server
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.created={{ .Date }}
+      - --label=org.opencontainers.image.source={{ .GitURL }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+      - --label=org.opencontainers.image.licenses=MIT
+
+docker_manifests:
+  - name_template: 'ghcr.io/2001adarsh/jenkins-mcp-go:{{ .Version }}'
+    image_templates:
+      - 'ghcr.io/2001adarsh/jenkins-mcp-go:{{ .Version }}-amd64'
+      - 'ghcr.io/2001adarsh/jenkins-mcp-go:{{ .Version }}-arm64'
+  - name_template: 'ghcr.io/2001adarsh/jenkins-mcp-go:latest'
+    image_templates:
+      - 'ghcr.io/2001adarsh/jenkins-mcp-go:{{ .Version }}-amd64'
+      - 'ghcr.io/2001adarsh/jenkins-mcp-go:{{ .Version }}-arm64'
+
+release:
+  draft: false
+  prerelease: auto

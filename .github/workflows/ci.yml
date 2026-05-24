@@ -76,3 +76,37 @@ jobs:
 
       - name: Smoke (binary exists)
         run: test -x ./bin/jenkins-mcp
+
+  release-check:
+    # Dry-run the release pipeline so config drift (goreleaser template
+    # errors, missing files, Dockerfile breakage) is caught before a tag
+    # is cut. --skip=publish means nothing leaves the runner.
+    name: Release dry-run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: goreleaser check
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: '~> v2'
+          args: check
+
+      - name: goreleaser snapshot
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: '~> v2'
+          args: release --snapshot --clean --skip=publish
