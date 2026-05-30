@@ -209,6 +209,16 @@ func run() error {
 	}, deps.SearchConsoleLog)
 
 	mcp.AddTool(srv, &mcp.Tool{
+		Name: "tail_running_build",
+		Description: "Stream a capped slice of an in-flight build's console via Jenkins' " +
+			"progressiveText endpoint. Echo the footer's Next since_byte back on the follow-up " +
+			"call to advance through the log without re-fetching. Never writes to the on-disk " +
+			"cache — the cache invariant (finished builds only) is preserved. When the build " +
+			"finishes, the footer references get_console_log_path for the cached full log " +
+			"going forward. Defaults: since_byte=0, max_bytes=65536 (cap 1 MB).",
+	}, deps.TailRunningBuild)
+
+	mcp.AddTool(srv, &mcp.Tool{
 		Name: "get_ginkgo_failure_summary",
 		Description: "Parse a Ginkgo `Summarizing N Failure` block from the build's console log " +
 			"and, for each failing spec, return the first [ERROR] line tagged with that spec name " +
