@@ -81,6 +81,7 @@ console log without re-downloading it on every question.
 | `get_flaky_candidates` | Rank flaky tests across the latest N completed builds of one job by counting pass↔fail flips. Returns a sorted table of test name, flip count, pass/fail tallies, and last-seen build. |
 | `get_test_history` | Per-build trend of a single test across the last N completed builds — the follow-up to `get_flaky_candidates` once a suspect is known. Timeline (build #, result, status, duration, error head) plus a summary of counts and flips. |
 | `find_test_by_name` | Locate which job runs a test whose full name contains a substring. Walks `list_jobs(recursive)` under `folder_path`, fans out per-job probes against `lastCompletedBuild/testReport` with a 5s per-job timeout, renders a sorted table of hits. |
+| `find_recent_failures` | Survey failed builds across the jobs under `folder_path` within a lookback window. Per-job probe of the last 5 builds; filters by `since` (24h default; supports `Nd`) and `result_filter` (FAILURE/UNSTABLE/ABORTED/ANY_NON_SUCCESS). |
 | `get_ginkgo_failure_summary` | Parse Ginkgo's `Summarizing N Failure` block and surface the first `[ERROR]` tagged with each spec name. |
 | `list_nodes` | List Jenkins agents/nodes with status, executor counts, labels, and monitor summaries. |
 | `get_node` | Per-node detail: status, per-executor idle state, labels, full monitor data. |

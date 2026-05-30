@@ -616,6 +616,50 @@ across three buckets:
 When the substring matches no test in any inspected job, the body
 renders `(no matches)` instead of the table.
 
+## `find_recent_failures`
+
+Survey failed builds across the jobs under `folder_path` within a
+lookback window. Answers *"what broke overnight under Builds/team?"*
+without an agent loop over `list_jobs` + `get_build_info`.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `folder_path` | string | no | `""` | Scope the search. Empty = Jenkins root. |
+| `since` | string | no | `"24h"` | Lookback window. Go duration syntax (`24h`, `30m`, `1h30m`) plus `Nd` for days (`7d`, `14d`). |
+| `result_filter` | string | no | `"FAILURE"` | One of `FAILURE`, `UNSTABLE`, `ABORTED`, or `ANY_NON_SUCCESS`. |
+| `max_results` | integer | no | `100` | Cap on rows. Capped further at 500. |
+
+Walks the job tree recursively, then fans out per-job
+`/api/json?tree=builds[number,result,timestamp,duration,url]{0,5}`
+probes (5 builds per job covers the 24h common case). Filters each
+build by `timestamp >= now - since` and `result` matching
+`result_filter`. Probes run with concurrency 6 (shared `fetchPerItem`
+helper).
+
+Output:
+
+```
+Recent failures under "Builds/team" (last 24h0m0s, filter=FAILURE):
+
+  job_path                                build  result    finished              duration
+  --------------------------------------- ------ --------- --------------------- --------
+  Builds/team/integration-tests           #92    FAILURE   2026-05-23 22:14 UTC  4m32s
+  Builds/team/smoke-tests                 #831   FAILURE   2026-05-23 18:02 UTC  1m12s
+
+2 results across 47 jobs scanned.
+```
+
+Footers:
+
+- **Truncation** — `(stopped at max_results=N — narrow folder_path,
+  since, or result_filter)` when results were capped.
+- **Wide window** — when `since > 7d`, a hint that only the last 5
+  builds per job were inspected and older failures within the window
+  may be missed.
+
+Sort is `timestamp` desc. Jobs whose `/api/json` returns 404 (or 403)
+contribute zero rows but still count toward `N jobs scanned`.
+
 ## `get_ginkgo_failure_summary`
 
 Parse Ginkgo's `Summarizing N Failure` block and, for each failing spec,
