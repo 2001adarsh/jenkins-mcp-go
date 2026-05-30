@@ -103,6 +103,14 @@ func run() error {
 	}, deps.HealthCheck)
 
 	mcp.AddTool(srv, &mcp.Tool{
+		Name: "get_plugin_versions",
+		Description: "List installed Jenkins plugins with versions via /pluginManager/api/json. " +
+			"Active-only by default (set include_inactive=true to surface disabled/failed plugins). " +
+			"Optional name_filter (case-insensitive RE2 regex) narrows by shortName. Capped at 200 rows. " +
+			"Returns a clear hint when the token lacks admin permission instead of erroring.",
+	}, deps.GetPluginVersions)
+
+	mcp.AddTool(srv, &mcp.Tool{
 		Name: "list_jobs",
 		Description: "Enumerate jobs and folders in Jenkins. Pass folder_path to scope the listing " +
 			"(empty = root), recursive=true to walk into sub-folders, and name_filter (case-insensitive " +
