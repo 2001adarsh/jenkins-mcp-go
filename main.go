@@ -241,6 +241,17 @@ func run() error {
 	}, deps.GetTestHistory)
 
 	mcp.AddTool(srv, &mcp.Tool{
+		Name: "find_test_by_name",
+		Description: "Locate which job runs a given test. Walks the job tree under folder_path " +
+			"(or root), then fans out per-job probes against /<job>/lastCompletedBuild/testReport " +
+			"with a 5s per-job timeout, matching test full names (className.name) against the " +
+			"case-insensitive substring. Renders a table of job_path, test name, last build " +
+			"number, and result. Defaults: folder_path='', max_results=50 (cap 200). Footer " +
+			"counts inspected jobs and how many were skipped (no test report, no completed " +
+			"build, timed out).",
+	}, deps.FindTestByName)
+
+	mcp.AddTool(srv, &mcp.Tool{
 		Name: "get_pipeline_stages",
 		Description: "List Declarative/Scripted Pipeline stages for a build with status and " +
 			"duration via /wfapi/describe. Use this first to find which stage failed before " +

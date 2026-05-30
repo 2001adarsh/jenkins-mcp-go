@@ -89,7 +89,7 @@ func (d Deps) GetFlakyCandidates(ctx context.Context, _ *mcp.CallToolRequest, in
 		)), nil, nil
 	}
 
-	results := fetchPerBuild(builds, func(num int64) flakyBuildResult {
+	results := fetchPerItem(builds, func(num int64) flakyBuildResult {
 		return d.fetchOneFlakyResult(ctx, in.JobPath, num)
 	})
 	// Surface the first hard error if any (e.g. auth failure). Missing
