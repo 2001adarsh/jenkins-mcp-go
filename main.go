@@ -161,7 +161,7 @@ func run() error {
 	}, deps.SearchConsoleLog)
 
 	mcp.AddTool(srv, &mcp.Tool{
-		Name: "get_failure_summary",
+		Name: "get_ginkgo_failure_summary",
 		Description: "Parse a Ginkgo `Summarizing N Failure` block from the build's console log " +
 			"and, for each failing spec, return the first [ERROR] line tagged with that spec name " +
 			"plus surrounding context. Ginkgo-specific — returns a hint if the log doesn't look like Ginkgo.",

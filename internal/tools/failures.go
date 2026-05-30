@@ -111,7 +111,7 @@ func FindFirstErrorForSpec(cleanLines []string, specName string, ctxLines int) (
 	return 0, ""
 }
 
-// GetFailureSummaryInput is the schema for get_failure_summary.
+// GetFailureSummaryInput is the schema for get_ginkgo_failure_summary.
 type GetFailureSummaryInput struct {
 	JobPath      string `json:"job_path" jsonschema:"Slash-separated job path"`
 	BuildNumber  int64  `json:"build_number" jsonschema:"Build number. Use 0 or omit for the latest build."`

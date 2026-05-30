@@ -73,7 +73,7 @@ func (d Deps) GetTestReport(ctx context.Context, _ *mcp.CallToolRequest, in GetT
 			return textResult(
 				"No test report published for this build (HTTP 404 on /testReport/api/json). " +
 					"The job may not have a JUnit publisher configured — " +
-					"use get_failure_summary against the console log instead.",
+					"use get_ginkgo_failure_summary against the console log instead.",
 			), nil, nil
 		}
 		return nil, nil, err
