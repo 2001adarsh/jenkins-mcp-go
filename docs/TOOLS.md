@@ -349,6 +349,47 @@ Fetch a single pipeline stage's log via
 | `build_number` | integer | no | `0` | Build number. |
 | `stage_id` | string | yes | — | Stage id from `get_pipeline_stages` (e.g. `"188"`). |
 
+## `get_pipeline_script`
+
+Return the Jenkinsfile a specific build actually ran. Critical for
+triaging old builds — `main` may have moved on since, so the job-level
+Jenkinsfile is the wrong answer.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `job_path` | string | yes | — | Slash-separated job path. |
+| `build_number` | integer | no | `0` | Build to pin to. `0` = `lastBuild`. |
+
+Two-tier fallback, source provenance surfaced in the output header:
+
+1. **Replay plugin** — `GET /<job>/<build>/replay/` returns the HTML
+   replay page; the build-pinned Jenkinsfile lives in `<textarea
+   name="mainScript">`. This is the faithful source. Tagged
+   `(source: replay)`.
+2. **Job-level `config.xml`** — `GET /<job>/config.xml`. If the job
+   defines an inline pipeline script (`CpsFlowDefinition`), it's
+   returned tagged `(source: job-config-fallback)` with a NOTE that the
+   build-pinned source was unavailable.
+
+For Pipeline-from-SCM jobs (`CpsScmFlowDefinition`) where the
+Jenkinsfile lives in git rather than in `config.xml`, the tool returns a
+hint with the SCM repo URL, branch, and `scriptPath` so the agent can
+clone and read it independently:
+
+```
+Pipeline script for team/svc build #42: build-pinned source unavailable.
+Job uses Pipeline from SCM:
+  repo:   git@github.com:foo/bar.git
+  branch: main
+  path:   ci/Jenkinsfile
+Use get_scm_context to find the commit, then clone+read the Jenkinsfile.
+```
+
+If both tiers fail, the tool returns an error describing both failure
+reasons. The Replay endpoint requires the Replay plugin and the
+`Run/Replay` permission on the build — `whoami_can` is the right tool
+to check that up-front.
+
 ## `get_test_report`
 
 Fetch structured JUnit results from `/testReport/api/json`. Failed cases are
