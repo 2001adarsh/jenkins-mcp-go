@@ -660,6 +660,44 @@ Footers:
 Sort is `timestamp` desc. Jobs whose `/api/json` returns 404 (or 403)
 contribute zero rows but still count toward `N jobs scanned`.
 
+## `list_pr_builds`
+
+List all builds for a PR on a `WorkflowMultiBranchProject`. PR-backed
+multibranch jobs are how most teams use Jenkins as CI, and the PR
+branch naming convention varies (`PR-N`, `pull/N/head`, `change-N`,
+`pr/N`). This tool probes all four in parallel and renders the build
+history for the first match in priority order.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `job_path` | string | yes | — | Slash-separated multibranch job path. |
+| `pr_number` | integer | yes | — | PR / change number. Must be `> 0`. |
+| `max_builds` | integer | no | `20` | Cap per branch. Capped further at 100. |
+
+The tool first issues `GET /<job>/api/json?tree=_class` to confirm
+the job is a `WorkflowMultiBranchProject` — if not, it returns a hint
+pointing the caller at `list_branches`. Then it probes the four
+canonical branch names in parallel (`PR-N`, `pull/N/head`, `change-N`,
+`pr/N`) and resolves to the first one that returns 200, in that
+priority order. If none match, it returns a hint listing all four
+candidates and the recommendation to call `list_branches` for the
+actual branch list.
+
+Output:
+
+```
+Builds for PR #123 of Builds/team/svc (branch: PR-123):
+
+  build   result     finished              duration
+  ------  ---------  --------------------  --------
+  #5      SUCCESS    2026-05-23 21:14 UTC  3m2s
+  #4      FAILURE    2026-05-23 14:32 UTC  2m45s
+
+2 builds across the PR's lifetime.
+```
+
+In-progress builds (no `result` yet) render as `(running)`.
+
 ## `get_ginkgo_failure_summary`
 
 Parse Ginkgo's `Summarizing N Failure` block and, for each failing spec,
