@@ -111,6 +111,15 @@ func run() error {
 	}, deps.GetPluginVersions)
 
 	mcp.AddTool(srv, &mcp.Tool{
+		Name: "whoami_can",
+		Description: "Resolve the configured token's effective Read / Build / Cancel / Configure " +
+			"permissions on a job by issuing read-only HTTP probes (every probe is a GET — this tool " +
+			"never POSTs, even with read-only mode off). Use up-front when you're about to trigger " +
+			"or cancel a build to avoid burning a turn on a 403. Each row reports OK / DENIED / UNKNOWN; " +
+			"folders surface build/cancel as N/A, and cancel is N/A when there's no last build.",
+	}, deps.WhoamiCan)
+
+	mcp.AddTool(srv, &mcp.Tool{
 		Name: "list_jobs",
 		Description: "Enumerate jobs and folders in Jenkins. Pass folder_path to scope the listing " +
 			"(empty = root), recursive=true to walk into sub-folders, and name_filter (case-insensitive " +

@@ -61,6 +61,7 @@ console log without re-downloading it on every question.
 | --- | --- |
 | `health_check` | Validate the server's setup: Jenkins reachability and version, authenticated user, CSRF crumb issuer, Pipeline/JUnit plugin presence, online/offline node counts, clock skew, and the effective config the process is running with. |
 | `get_plugin_versions` | List installed Jenkins plugins with versions, pinned flag, and pending-update flag. Optional `name_filter` (RE2) and `include_inactive`. 403 degrades to a clear hint. |
+| `whoami_can` | Probe a job for the configured token's effective Read / Build / Cancel / Configure permissions via read-only `GET` requests. Useful up-front to avoid a 403 on a trigger or cancel. Stays read-only even when `JENKINS_MCP_READONLY=false`. |
 | `list_jobs` | Enumerate jobs and folders under a path (or root). Optional recursion and case-insensitive RE2 name filter; capped at 500 entries. |
 | `list_branches` | Enumerate the branches of a `WorkflowMultiBranchProject` with per-branch last-build number, result, duration, and timestamp. Optional `name_filter` (RE2) and `healthy_only`. |
 | `get_console_log` | Tail the build's `/consoleText`. Defaults to last 500 lines; pass `tail_lines: -1` for the full log. |
