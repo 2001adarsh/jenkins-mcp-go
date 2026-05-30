@@ -274,6 +274,15 @@ func run() error {
 	}, deps.FindRecentFailures)
 
 	mcp.AddTool(srv, &mcp.Tool{
+		Name: "list_pr_builds",
+		Description: "List all builds for a PR on a WorkflowMultiBranchProject. Probes the " +
+			"common PR branch naming conventions in parallel (PR-N, pull/N/head, change-N, " +
+			"pr/N) and renders the build history for the first match in priority order. " +
+			"Returns a clear hint when job_path isn't multibranch (points at list_branches) " +
+			"or no branch matches the PR number. Defaults: max_builds=20 (cap 100).",
+	}, deps.ListPRBuilds)
+
+	mcp.AddTool(srv, &mcp.Tool{
 		Name: "get_pipeline_stages",
 		Description: "List Declarative/Scripted Pipeline stages for a build with status and " +
 			"duration via /wfapi/describe. Use this first to find which stage failed before " +
