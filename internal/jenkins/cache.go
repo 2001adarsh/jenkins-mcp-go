@@ -2,6 +2,7 @@ package jenkins
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -49,16 +50,19 @@ func NewConsoleCache(c *Client, dir string) (*ConsoleCache, error) {
 	}, nil
 }
 
-// Path returns the deterministic on-disk path for a (jobPath, buildNumber) log.
-// The slug is sanitized to a flat filename so directory traversal cannot escape
-// the cache root.
-func (cc *ConsoleCache) Path(jobPath string, buildNumber int64) string {
+// Path returns the deterministic on-disk path for a finished build's log.
+// The buildTimestampMs fragment ensures that a re-run reusing the same build
+// number (operator-deleted-then-replayed slot, "keep forever" toggled off,
+// etc.) maps to a distinct filename rather than silently colliding with the
+// previous body. The slug is sanitized to a flat filename so directory
+// traversal cannot escape the cache root.
+func (cc *ConsoleCache) Path(jobPath string, buildNumber, buildTimestampMs int64) string {
 	slug := strings.ReplaceAll(strings.Trim(jobPath, "/"), "/", "__")
 	slug = unsafeSlugChar.ReplaceAllString(slug, "_")
 	if len(slug) > 180 {
 		slug = slug[:180]
 	}
-	return filepath.Join(cc.Dir, fmt.Sprintf("%s-%d.log", slug, buildNumber))
+	return filepath.Join(cc.Dir, fmt.Sprintf("%s-%d-%d.log", slug, buildNumber, buildTimestampMs))
 }
 
 // Fetch returns the full consoleText body for a build and, if cached on disk,
@@ -66,20 +70,36 @@ func (cc *ConsoleCache) Path(jobPath string, buildNumber int64) string {
 //
 // Behavior:
 //   - buildNumber == 0 (lastBuild) is never cached — its identity is unstable.
-//   - For positive build numbers, a cache hit short-circuits the network.
+//   - For positive build numbers, the build's timestamp is probed via a tiny
+//     `api/json?tree=timestamp` call and folded into the cache filename. This
+//     guarantees that a same-number replay (operator-deleted slot, "keep
+//     forever" toggle, etc.) misses the cache cleanly instead of serving the
+//     prior body. If the probe fails, the body is served from the network
+//     without being cached — better to refetch than to risk a poisoned cache.
 //   - A network response is written to disk only if the body contains the
 //     `Finished: <result>` marker, guaranteeing the cached file is complete.
 func (cc *ConsoleCache) Fetch(ctx context.Context, jobPath string, buildNumber int64) (body []byte, cachePath string, err error) {
+	var (
+		ts      int64
+		probeOK bool
+	)
 	if buildNumber > 0 {
-		cachePath = cc.Path(jobPath, buildNumber)
-		if b, e := os.ReadFile(cachePath); e == nil {
-			now := time.Now()
-			_ = os.Chtimes(cachePath, now, now)
-			debugf("cache hit  %s (%d bytes)", cachePath, len(b))
-			return b, cachePath, nil
+		var probeErr error
+		ts, probeErr = cc.buildTimestamp(ctx, jobPath, buildNumber)
+		if probeErr != nil {
+			debugf("cache identity probe failed for %s build %d: %v", jobPath, buildNumber, probeErr)
+		} else {
+			probeOK = true
+			cachePath = cc.Path(jobPath, buildNumber, ts)
+			if b, e := os.ReadFile(cachePath); e == nil {
+				now := time.Now()
+				_ = os.Chtimes(cachePath, now, now)
+				debugf("cache hit  %s (%d bytes)", cachePath, len(b))
+				return b, cachePath, nil
+			}
+			debugf("cache miss %s", cachePath)
+			cachePath = ""
 		}
-		debugf("cache miss %s", cachePath)
-		cachePath = ""
 	}
 
 	url := JobAPIPath(jobPath) + "/" + BuildRef(buildNumber) + "/consoleText"
@@ -88,8 +108,8 @@ func (cc *ConsoleCache) Fetch(ctx context.Context, jobPath string, buildNumber i
 		return nil, "", err
 	}
 
-	if buildNumber > 0 && finishedMarker.Match(tailBytes(body, 256)) {
-		path := cc.Path(jobPath, buildNumber)
+	if probeOK && finishedMarker.Match(tailBytes(body, 256)) {
+		path := cc.Path(jobPath, buildNumber, ts)
 		cc.mu.Lock()
 		defer cc.mu.Unlock()
 		if writeErr := os.WriteFile(path, body, 0o644); writeErr == nil {
@@ -99,10 +119,29 @@ func (cc *ConsoleCache) Fetch(ctx context.Context, jobPath string, buildNumber i
 		} else {
 			debugf("cache write failed %s: %v", path, writeErr)
 		}
-	} else if buildNumber > 0 {
-		debugf("cache skip %s (build not finished)", cc.Path(jobPath, buildNumber))
+	} else if probeOK {
+		debugf("cache skip %s (build not finished)", cc.Path(jobPath, buildNumber, ts))
 	}
 	return body, cachePath, nil
+}
+
+// buildTimestamp probes the build's start timestamp (ms since epoch) via the
+// minimal `tree=timestamp` selector. Used to scope the cache key to a specific
+// run rather than just the build number — the latter can be reused after a
+// delete-and-replay.
+func (cc *ConsoleCache) buildTimestamp(ctx context.Context, jobPath string, buildNumber int64) (int64, error) {
+	path := JobAPIPath(jobPath) + "/" + BuildRef(buildNumber) + "/api/json"
+	body, err := cc.Client.Get(ctx, path, map[string]string{"tree": "timestamp"})
+	if err != nil {
+		return 0, err
+	}
+	var payload struct {
+		Timestamp int64 `json:"timestamp"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return 0, fmt.Errorf("parse build timestamp from %s: %w", path, err)
+	}
+	return payload.Timestamp, nil
 }
 
 // evictIfOverCap deletes oldest-mtime files until total cache size <= MaxBytes.
