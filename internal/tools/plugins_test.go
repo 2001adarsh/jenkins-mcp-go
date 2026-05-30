@@ -209,7 +209,7 @@ func TestGetPluginVersions_RendersActiveSorted(t *testing.T) {
 	if gitIdx < 0 || junitIdx < 0 || wfIdx < 0 {
 		t.Fatalf("missing plugin row in output:\n%s", text)
 	}
-	if !(gitIdx < junitIdx && junitIdx < wfIdx) {
+	if gitIdx >= junitIdx || junitIdx >= wfIdx {
 		t.Errorf("rows not sorted by shortName:\n%s", text)
 	}
 	if !strings.Contains(text, "3 of 3 plugins shown") {
