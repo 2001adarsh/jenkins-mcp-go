@@ -262,6 +262,18 @@ func run() error {
 	}, deps.FindTestByName)
 
 	mcp.AddTool(srv, &mcp.Tool{
+		Name: "find_recent_failures",
+		Description: "Survey failed builds across the jobs under folder_path within a lookback " +
+			"window. Walks the job tree (recursive), fans out per-job /api/json probes against the " +
+			"last 5 builds per job, filters by timestamp and result, and renders a table sorted by " +
+			"timestamp desc. Defaults: folder_path='', since=24h, result_filter=FAILURE, " +
+			"max_results=100 (cap 500). since accepts Go durations plus Nd (e.g. 7d). " +
+			"result_filter is one of FAILURE, UNSTABLE, ABORTED, or ANY_NON_SUCCESS. Windows " +
+			"wider than 7d surface a hint that older builds outside the 5-build per-job window " +
+			"may be missed.",
+	}, deps.FindRecentFailures)
+
+	mcp.AddTool(srv, &mcp.Tool{
 		Name: "get_pipeline_stages",
 		Description: "List Declarative/Scripted Pipeline stages for a build with status and " +
 			"duration via /wfapi/describe. Use this first to find which stage failed before " +
