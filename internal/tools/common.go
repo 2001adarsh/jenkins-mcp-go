@@ -147,22 +147,22 @@ func (d Deps) discoverCompletedBuildsWithResult(ctx context.Context, jobPath str
 	return out, nil
 }
 
-// fetchPerBuild runs fetchFn against each build concurrently, capped at
-// perBuildFetchConcurrency, and returns results in the input build order.
-// Shared between get_flaky_candidates and get_test_history — both want
-// "run this per-build, gather all results, render".
-func fetchPerBuild[T any](builds []int64, fetchFn func(int64) T) []T {
-	results := make([]T, len(builds))
+// fetchPerItem runs fetchFn against each item concurrently, capped at
+// perBuildFetchConcurrency, and returns results in input order. Used to
+// fan out per-build (int64-keyed) or per-job (string-keyed) HTTP requests
+// against Jenkins without opening N sockets at once.
+func fetchPerItem[K, T any](items []K, fetchFn func(K) T) []T {
+	results := make([]T, len(items))
 	sem := make(chan struct{}, perBuildFetchConcurrency)
 	var wg sync.WaitGroup
-	for i, n := range builds {
+	for i, item := range items {
 		wg.Add(1)
-		go func(idx int, num int64) {
+		go func(idx int, k K) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			results[idx] = fetchFn(num)
-		}(i, n)
+			results[idx] = fetchFn(k)
+		}(i, item)
 	}
 	wg.Wait()
 	return results

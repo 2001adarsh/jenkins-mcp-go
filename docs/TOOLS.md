@@ -529,6 +529,49 @@ build in the window. Parallel-fetches the per-build test reports
 (concurrency 6) and shares the build-discovery helper with
 `get_flaky_candidates`.
 
+## `find_test_by_name`
+
+Locate which job runs a given test. Walks the job tree under
+`folder_path` (or root) recursively, then fans out per-job probes
+against `/<job>/lastCompletedBuild/testReport` and matches test full
+names (`className.name`) against a case-insensitive substring.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `substring` | string | yes | — | Case-insensitive substring matched against fully-qualified test names. |
+| `folder_path` | string | no | `""` | Scope the search to a folder. Empty = Jenkins root. |
+| `max_results` | integer | no | `50` | Cap on hits. Capped further at 200. |
+
+Each job probe makes two requests (`lastCompletedBuild/api/json` for
+the build number+result, then `…/testReport/api/json` for the cases),
+wrapped in a 5s per-job timeout so a single stuck job doesn't block
+the whole search. Probes run with concurrency 6 (shared `fetchPerItem`
+helper).
+
+Output:
+
+```
+Tests matching "must_return_404" under "" (root, recursive):
+
+  job_path                     test full name                          last_seen_build  result
+  ---------------------------  --------------------------------------  ---------------  -------
+  Builds/team/integration      com.example.FooSpec.must_return_404     #4521            SUCCESS
+  Builds/team/smoke            com.example.api.HealthSpec.must_…       #832             FAILURE
+
+Inspected 47 jobs (3 skipped: no test report).
+```
+
+Footer reports how many jobs were inspected and how many were skipped
+across three buckets:
+
+- `N skipped: no test report` — `/testReport/api/json` returned 404.
+- `N skipped: no completed build` — `/lastCompletedBuild/api/json`
+  returned 404 (job hasn't completed once).
+- `N timed out` — per-job probe exceeded the 5s budget.
+
+When the substring matches no test in any inspected job, the body
+renders `(no matches)` instead of the table.
+
 ## `get_ginkgo_failure_summary`
 
 Parse Ginkgo's `Summarizing N Failure` block and, for each failing spec,

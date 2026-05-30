@@ -77,7 +77,7 @@ func (d Deps) GetTestHistory(ctx context.Context, _ *mcp.CallToolRequest, in Get
 		)), nil, nil
 	}
 
-	results := fetchPerBuild(buildNumbers(builds), func(num int64) testHistoryResult {
+	results := fetchPerItem(buildNumbers(builds), func(num int64) testHistoryResult {
 		return d.fetchOneTestHistory(ctx, in.JobPath, normalized, num, buildResultByNumber(builds, num))
 	})
 	for _, r := range results {
