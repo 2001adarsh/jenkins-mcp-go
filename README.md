@@ -69,6 +69,8 @@ console log without re-downloading it on every question.
 | `search_console_log` | RE2 regex search over the console log with line-number-aware context windows. |
 | `get_build_info` | Pretty-printed build summary: result, duration, parameters, change set. |
 | `get_scm_context` | Per-commit history for one build: commit id, author, timestamp, message subject, and each commit's touched paths with `A`/`M`/`D` edit codes. Pipeline change sets are flattened with per-set headers. Optional RE2 `path_filter`. |
+| `last_green_build` | Report the most recent successful build of a job. Returns number, finish time (UTC), and URL — the start point for bisect-from-green. |
+| `changes_since_last_green` | Union the commits across every completed build since the job's last green. Walks `previousCompletedBuild`, dedupes by `commitId`, supports `path_filter` and `max_commits`. Surfaces 'all green' and wide-window footers. |
 | `compare_builds` | Diff two builds of the same job across result, duration, parameters, SCM commits, pipeline stages, and JUnit tests. The agent answers "what changed between A and B?" in one call. |
 | `get_pipeline_stages` | List Declarative/Scripted Pipeline stages via `/wfapi/describe` with status and duration. |
 | `get_stage_log` | Fetch a single pipeline stage's log via `/execution/node/<id>/wfapi/log`. |

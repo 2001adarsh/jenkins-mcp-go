@@ -207,6 +207,62 @@ A top-level `Culprits: …` line is included when Jenkins reports culprits
 for the build. Builds with no SCM changes render `(no commits in change
 set)`.
 
+## `last_green_build`
+
+Report the most recent successful build of a job via
+`/<job>/lastSuccessfulBuild/api/json`. Use as the "start point" for triage
+— pair with `changes_since_last_green` to see what's landed since.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `job_path` | string | yes | — | Slash-separated job path. |
+
+Output:
+
+```
+Last green build of team/svc: #42
+  Finished: 2025-05-16 12:00 (UTC)
+  URL:      https://jenkins.example.com/job/team/job/svc/42/
+```
+
+A `no successful build yet for <job>` hint is returned (not an error)
+when Jenkins reports 404 on the endpoint — i.e. the job has never had a
+green build.
+
+## `changes_since_last_green`
+
+Union the commits across every completed build since the job's last
+successful one. Walks `previousCompletedBuild` from the latest completed
+build down to (but not including) the last green, skipping aborted and
+in-progress builds. Dedupes by `commitId` (first sighting wins).
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `job_path` | string | yes | — | Slash-separated job path. |
+| `max_commits` | integer | no | `100` | Cap on commits rendered; a footer notes when the cap is hit. |
+| `path_filter` | string | no | — | Case-insensitive RE2 regex; only commits touching a matching path are returned. Mirrors `get_scm_context`. |
+
+Output: a one-line header followed by `get_scm_context`-style commit
+rows.
+
+```
+3 commits across 2 builds since last green #40 (latest: #42)
+abc1234 alice 2025-05-16 12:00  "Fix payment retry"
+  M  internal/payment/processor.go
+def5678 bob 2025-05-16 12:00  "Refactor cache"
+  M  internal/jenkins/cache.go
+```
+
+Special cases:
+
+- **All green** — when the latest completed build is the last green, the
+  tool returns `all green — last completed build #C is the same as last
+  successful build for <job>` instead of an empty rendering.
+- **No green ever** — returns `no successful build yet for <job>` hint.
+- **Wide window** — when more than 50 builds sit between the last green
+  and the latest completed build, a `(wide window: N builds between
+  greens — review carefully)` footer is appended.
+
 ## `compare_builds`
 
 Diff two builds of the same job. Use this to answer "build B failed but A
