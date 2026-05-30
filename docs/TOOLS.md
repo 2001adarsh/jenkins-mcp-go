@@ -282,7 +282,7 @@ pkg.refund.RefundFlow                                             3      10     
 Rows are sorted by flips desc, then failures desc, then test name asc
 for stable ordering. The `test` column is rune-truncated at 60 chars.
 
-## `get_failure_summary`
+## `get_ginkgo_failure_summary`
 
 Parse Ginkgo's `Summarizing N Failure` block and, for each failing spec,
 return the first `[ERROR]` line tagged with that spec name plus surrounding

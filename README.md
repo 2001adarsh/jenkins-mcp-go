@@ -72,7 +72,7 @@ console log without re-downloading it on every question.
 | `get_stage_log` | Fetch a single pipeline stage's log via `/execution/node/<id>/wfapi/log`. |
 | `get_test_report` | Structured JUnit results from `/testReport/api/json`, with failed cases and head+tail of stack traces. |
 | `get_flaky_candidates` | Rank flaky tests across the latest N completed builds of one job by counting pass↔fail flips. Returns a sorted table of test name, flip count, pass/fail tallies, and last-seen build. |
-| `get_failure_summary` | Parse Ginkgo's `Summarizing N Failure` block and surface the first `[ERROR]` tagged with each spec name. |
+| `get_ginkgo_failure_summary` | Parse Ginkgo's `Summarizing N Failure` block and surface the first `[ERROR]` tagged with each spec name. |
 | `list_nodes` | List Jenkins agents/nodes with status, executor counts, labels, and monitor summaries. |
 | `get_node` | Per-node detail: status, per-executor idle state, labels, full monitor data. |
 | `list_queue` | List pending Jenkins queue items with the block reason for each. |
@@ -264,7 +264,7 @@ Once the server is registered, ask your agent things like:
 - *"Which commits in build 86 touched anything under `internal/auth/`?"*
   → calls `get_scm_context` with `path_filter: "^internal/auth/"`.
 - *"Which Ginkgo specs failed in build 92 and what was the first error each emitted?"*
-  → calls `get_failure_summary`.
+  → calls `get_ginkgo_failure_summary`.
 - *"Cache the full log for build 4521 so I can grep it locally."*
   → calls `get_console_log_path`; the agent then uses its own `Read`/`Grep`/`Bash`
   tools on the returned path.
@@ -352,7 +352,7 @@ build to disk; the tool returns a local path the agent can then `Read`,
 
 ### Does it handle Ginkgo test failures specifically?
 
-Yes. `get_failure_summary` parses Ginkgo's `Summarizing N Failure` block and
+Yes. `get_ginkgo_failure_summary` parses Ginkgo's `Summarizing N Failure` block and
 surfaces the first `[ERROR]` line tagged with each spec name plus surrounding
 context — much faster than asking the agent to scan the whole log.
 
