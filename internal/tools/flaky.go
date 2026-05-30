@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -26,12 +25,6 @@ const (
 	// defaultMinFlips is the smallest meaningful flip count: a test that
 	// passed then failed (once) once may just be a regression, not flake.
 	defaultMinFlips = 2
-	// flakyFetchConcurrency caps in-flight testReport requests so a 50-build
-	// sample doesn't open 50 sockets at once against the Jenkins controller.
-	flakyFetchConcurrency = 6
-	// flakyBuildBuffer extends the build-list fetch beyond sample_size so
-	// in-progress builds at the head don't shrink the effective sample.
-	flakyBuildBuffer = 5
 	// flakyTestNameWidth is the rendered width of the test column; longer
 	// names are rune-truncated.
 	flakyTestNameWidth = 60
@@ -41,26 +34,12 @@ const (
 // don't need stack traces, durations, or counts to compute flips.
 const flakyTestsTree = "suites[cases[className,name,status]]"
 
-// flakyBuildListTreeFmt asks for the latest N builds with just number +
-// result. result tells us whether the build is completed; the {0,N} range
-// avoids dragging in 1000-entry build histories.
-const flakyBuildListTreeFmt = "builds[number,result]{0,%d}"
-
 // GetFlakyCandidatesInput is the schema for get_flaky_candidates.
 type GetFlakyCandidatesInput struct {
 	JobPath        string `json:"job_path" jsonschema:"Slash-separated job path."`
 	SampleSize     int    `json:"sample_size,omitempty" jsonschema:"How many of the most recent completed builds to inspect. Default 20, capped at 50."`
 	MinFlips       int    `json:"min_flips,omitempty" jsonschema:"Minimum pass↔fail transitions for a test to be reported. Default 2."`
 	IncludeSkipped bool   `json:"include_skipped,omitempty" jsonschema:"When true, SKIPPED counts as a state that contributes to flip counting. Default false (SKIPPED is ignored)."`
-}
-
-type flakyBuildRef struct {
-	Number int64  `json:"number"`
-	Result string `json:"result"`
-}
-
-type flakyJobAPI struct {
-	Builds []flakyBuildRef `json:"builds"`
 }
 
 // flakyBuildResult is the per-build slice of the aggregation. Err is set
@@ -99,7 +78,7 @@ func (d Deps) GetFlakyCandidates(ctx context.Context, _ *mcp.CallToolRequest, in
 		minFlips = defaultMinFlips
 	}
 
-	builds, err := d.discoverFlakyBuilds(ctx, in.JobPath, sampleSize)
+	builds, err := d.discoverCompletedBuilds(ctx, in.JobPath, sampleSize)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -110,7 +89,9 @@ func (d Deps) GetFlakyCandidates(ctx context.Context, _ *mcp.CallToolRequest, in
 		)), nil, nil
 	}
 
-	results := d.fetchFlakyResults(ctx, in.JobPath, builds)
+	results := fetchPerBuild(builds, func(num int64) flakyBuildResult {
+		return d.fetchOneFlakyResult(ctx, in.JobPath, num)
+	})
 	// Surface the first hard error if any (e.g. auth failure). Missing
 	// testReport (404) is not an error — empty Tests map is allowed.
 	for _, r := range results {
@@ -121,52 +102,6 @@ func (d Deps) GetFlakyCandidates(ctx context.Context, _ *mcp.CallToolRequest, in
 
 	agg := aggregateFlaky(results, in.IncludeSkipped)
 	return textResult(renderFlaky(in.JobPath, sampleSize, minFlips, in.IncludeSkipped, results, agg)), nil, nil
-}
-
-// discoverFlakyBuilds returns the latest sample_size completed build
-// numbers under jobPath. In-progress builds at the head are filtered out,
-// so the fetch asks for sample_size + flakyBuildBuffer to leave headroom.
-func (d Deps) discoverFlakyBuilds(ctx context.Context, jobPath string, sampleSize int) ([]int64, error) {
-	apiPath := jenkins.JobAPIPath(jobPath) + "/api/json"
-	tree := fmt.Sprintf(flakyBuildListTreeFmt, sampleSize+flakyBuildBuffer)
-	body, err := d.Client.Get(ctx, apiPath, map[string]string{"tree": tree})
-	if err != nil {
-		return nil, fmt.Errorf("list builds for %s: %w", jobPath, err)
-	}
-	var listing flakyJobAPI
-	if err := json.Unmarshal(body, &listing); err != nil {
-		return nil, fmt.Errorf("parse build listing: %w", err)
-	}
-	nums := make([]int64, 0, sampleSize)
-	for _, b := range listing.Builds {
-		if b.Result == "" {
-			continue
-		}
-		nums = append(nums, b.Number)
-		if len(nums) >= sampleSize {
-			break
-		}
-	}
-	return nums, nil
-}
-
-// fetchFlakyResults grabs the testReport for each build in parallel, capped
-// at flakyFetchConcurrency. Order in the returned slice matches builds[].
-func (d Deps) fetchFlakyResults(ctx context.Context, jobPath string, builds []int64) []flakyBuildResult {
-	results := make([]flakyBuildResult, len(builds))
-	sem := make(chan struct{}, flakyFetchConcurrency)
-	var wg sync.WaitGroup
-	for i, n := range builds {
-		wg.Add(1)
-		go func(idx int, num int64) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			results[idx] = d.fetchOneFlakyResult(ctx, jobPath, num)
-		}(i, n)
-	}
-	wg.Wait()
-	return results
 }
 
 func (d Deps) fetchOneFlakyResult(ctx context.Context, jobPath string, num int64) flakyBuildResult {

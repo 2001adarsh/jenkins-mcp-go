@@ -5,9 +5,12 @@
 package tools
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -73,6 +76,96 @@ func padRight(s string, width int) string {
 		return s
 	}
 	return s + strings.Repeat(" ", width-n)
+}
+
+// perBuildFetchConcurrency caps in-flight per-build requests so a 50-build
+// sample doesn't open 50 sockets at once against the Jenkins controller.
+// Shared by tools that walk recent builds (get_flaky_candidates,
+// get_test_history).
+const perBuildFetchConcurrency = 6
+
+// completedBuildsBuffer extends the build-list fetch beyond sample_size so
+// in-progress builds at the head don't shrink the effective sample.
+const completedBuildsBuffer = 5
+
+// completedBuildListTreeFmt is the `tree` selector for the latest N builds
+// with just number + result. result tells us whether the build is
+// completed; the {0,N} range avoids dragging in 1000-entry build histories.
+const completedBuildListTreeFmt = "builds[number,result]{0,%d}"
+
+// completedBuild is one entry returned by discoverCompletedBuildsWithResult.
+type completedBuild struct {
+	Number int64
+	Result string
+}
+
+// discoverCompletedBuilds returns the latest sample_size completed build
+// numbers under jobPath. Convenience wrapper over
+// discoverCompletedBuildsWithResult for callers that only need numbers.
+func (d Deps) discoverCompletedBuilds(ctx context.Context, jobPath string, sampleSize int) ([]int64, error) {
+	builds, err := d.discoverCompletedBuildsWithResult(ctx, jobPath, sampleSize)
+	if err != nil {
+		return nil, err
+	}
+	nums := make([]int64, len(builds))
+	for i, b := range builds {
+		nums[i] = b.Number
+	}
+	return nums, nil
+}
+
+// discoverCompletedBuildsWithResult returns the latest sample_size completed
+// builds under jobPath, with each build's result (SUCCESS/FAILURE/UNSTABLE/
+// ABORTED). In-progress builds at the head are filtered out, so the fetch
+// asks for sample_size + completedBuildsBuffer to leave headroom.
+func (d Deps) discoverCompletedBuildsWithResult(ctx context.Context, jobPath string, sampleSize int) ([]completedBuild, error) {
+	apiPath := jenkins.JobAPIPath(jobPath) + "/api/json"
+	tree := fmt.Sprintf(completedBuildListTreeFmt, sampleSize+completedBuildsBuffer)
+	body, err := d.Client.Get(ctx, apiPath, map[string]string{"tree": tree})
+	if err != nil {
+		return nil, fmt.Errorf("list builds for %s: %w", jobPath, err)
+	}
+	var listing struct {
+		Builds []struct {
+			Number int64  `json:"number"`
+			Result string `json:"result"`
+		} `json:"builds"`
+	}
+	if err := json.Unmarshal(body, &listing); err != nil {
+		return nil, fmt.Errorf("parse build listing: %w", err)
+	}
+	out := make([]completedBuild, 0, sampleSize)
+	for _, b := range listing.Builds {
+		if b.Result == "" {
+			continue
+		}
+		out = append(out, completedBuild{Number: b.Number, Result: b.Result})
+		if len(out) >= sampleSize {
+			break
+		}
+	}
+	return out, nil
+}
+
+// fetchPerBuild runs fetchFn against each build concurrently, capped at
+// perBuildFetchConcurrency, and returns results in the input build order.
+// Shared between get_flaky_candidates and get_test_history — both want
+// "run this per-build, gather all results, render".
+func fetchPerBuild[T any](builds []int64, fetchFn func(int64) T) []T {
+	results := make([]T, len(builds))
+	sem := make(chan struct{}, perBuildFetchConcurrency)
+	var wg sync.WaitGroup
+	for i, n := range builds {
+		wg.Add(1)
+		go func(idx int, num int64) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			results[idx] = fetchFn(num)
+		}(i, n)
+	}
+	wg.Wait()
+	return results
 }
 
 // pathFooter formats the trailing breadcrumb that points callers at the

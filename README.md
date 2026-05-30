@@ -78,6 +78,7 @@ console log without re-downloading it on every question.
 | `get_pipeline_script` | Return the Jenkinsfile a specific build actually ran. Tries the Replay plugin first (build-pinned), falls back to `config.xml` (job-level — provenance surfaced). Returns SCM coords as a hint for Pipeline-from-SCM jobs. |
 | `get_test_report` | Structured JUnit results from `/testReport/api/json`, with failed cases and head+tail of stack traces. |
 | `get_flaky_candidates` | Rank flaky tests across the latest N completed builds of one job by counting pass↔fail flips. Returns a sorted table of test name, flip count, pass/fail tallies, and last-seen build. |
+| `get_test_history` | Per-build trend of a single test across the last N completed builds — the follow-up to `get_flaky_candidates` once a suspect is known. Timeline (build #, result, status, duration, error head) plus a summary of counts and flips. |
 | `get_ginkgo_failure_summary` | Parse Ginkgo's `Summarizing N Failure` block and surface the first `[ERROR]` tagged with each spec name. |
 | `list_nodes` | List Jenkins agents/nodes with status, executor counts, labels, and monitor summaries. |
 | `get_node` | Per-node detail: status, per-executor idle state, labels, full monitor data. |
