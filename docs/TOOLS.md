@@ -47,6 +47,29 @@ home — `d.Cache.Dir` / `d.Cache.MaxBytes` for the cache, `d.Client.Timeout()`
 for the HTTP timeout, plus the server-policy fields (binary version, read-only
 mode) the process resolved at startup.
 
+## `get_plugin_versions`
+
+List installed Jenkins plugins with their versions via
+`/pluginManager/api/json`. Use this to answer "is plugin X loaded, at what
+version?", "which plugins have updates pending?", or "what's the active
+git-plugin version?" — questions that `health_check` (which probes a fixed
+two-plugin set) cannot.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `name_filter` | string | no | — | Case-insensitive RE2 regex matched against plugin `shortName`. |
+| `include_inactive` | bool | no | `false` | Include disabled or failed plugins. Default keeps the listing focused on what's actually running. |
+
+Output is a sorted table of `shortName | longName | version | pinned |
+hasUpdate`, with `active | enabled` columns added when
+`include_inactive=true`. The header reports `N of M plugins shown` and the
+active scope so truncation is unambiguous.
+
+Capped at **200 rows**. The cap is rarely hit on real instances; when it is,
+the footer points the caller at `name_filter`. A 403 (token lacks
+`Overall/Read` on `/pluginManager`) degrades to a clear hint rather than an
+error — same shape as `health_check`'s `WARN` plugin row.
+
 ## `list_jobs`
 
 Enumerate jobs and folders under `folder_path` (root when empty). Use this
