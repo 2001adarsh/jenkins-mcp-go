@@ -316,6 +316,50 @@ surrounding context.
 Each match is rendered with a 1-indexed line number and an arrow marker on the
 hit line.
 
+## `tail_running_build`
+
+Stream a capped slice of an in-flight build's console via Jenkins'
+`/<job>/<build>/logText/progressiveText` endpoint. Designed for
+progressive tailing: the response footer echoes `Next since_byte=N`
+which the agent passes back on the follow-up call to advance through
+the log without re-fetching the prefix.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `job_path` | string | yes | — | Slash-separated job path. |
+| `build_number` | integer | no | `0` | Build to tail. `0` = `lastBuild`. |
+| `since_byte` | integer | no | `0` | Start byte offset. Echo back from the previous call's footer. |
+| `max_bytes` | integer | no | `65536` | Cap on bytes returned per call. Hard-capped at 1 MB. |
+
+**Cache invariant:** the result of this tool is never written to the
+on-disk cache. The cache contract is *finished builds only*; the
+progressive endpoint can produce partial content for in-flight builds,
+which would corrupt the cache.
+
+Output is the byte chunk followed by a one-line footer:
+
+```
+<chunk text>
+--- bytes 32768..98304 (more=true). Next since_byte=98304 ---
+```
+
+When the build has finished and there are no more bytes, the footer
+points at `get_console_log_path` for the cached full log:
+
+```
+<chunk text>
+--- bytes 32768..120480 (more=false; build finished). Use get_console_log_path for the cached full log. ---
+```
+
+Special cases:
+
+- **No new bytes** — when `since_byte == X-Text-Size`, the body
+  renders `(no new bytes; build still running)` (or `…; build
+  finished`) and the footer leaves the offset unchanged.
+- **Truncated** — when the wire returned more than `max_bytes`, the
+  chunk is truncated and `more=true` regardless of build state. The
+  next offset is `since_byte + max_bytes`.
+
 ## `get_build_info`
 
 Pretty-printed build summary: number, result, duration, parameters, change
