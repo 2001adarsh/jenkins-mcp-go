@@ -164,6 +164,27 @@ func run() error {
 	}, deps.GetSCMContext)
 
 	mcp.AddTool(srv, &mcp.Tool{
+		Name: "last_green_build",
+		Description: "Report the most recent successful build of a job via " +
+			"/<job>/lastSuccessfulBuild/api/json. Renders the build number, finish " +
+			"time (UTC), and URL. Returns a clear hint when the job has never had a " +
+			"successful build. Use as the start point for bisect — pair with " +
+			"changes_since_last_green to see what's landed since.",
+	}, deps.LastGreenBuild)
+
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "changes_since_last_green",
+		Description: "Union the commits across every completed build since the job's " +
+			"last successful one. Walks previousCompletedBuild from the latest " +
+			"completed build down to (but not including) the last green, skipping " +
+			"aborted/in-progress builds. Dedupes by commitId. Optional path_filter " +
+			"(case-insensitive RE2) narrows by touched path; max_commits caps rendering " +
+			"(default 100). Surfaces an 'all green' message when the latest completed " +
+			"build is the last green, and a warning footer when more than 50 builds " +
+			"sit between greens.",
+	}, deps.ChangesSinceLastGreen)
+
+	mcp.AddTool(srv, &mcp.Tool{
 		Name: "compare_builds",
 		Description: "Diff two builds of the same job across result, duration, parameters, SCM " +
 			"commits, pipeline stages, and JUnit tests. Inputs are explicit build numbers (build_a, " +
