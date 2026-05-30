@@ -74,6 +74,7 @@ console log without re-downloading it on every question.
 | `compare_builds` | Diff two builds of the same job across result, duration, parameters, SCM commits, pipeline stages, and JUnit tests. The agent answers "what changed between A and B?" in one call. |
 | `get_pipeline_stages` | List Declarative/Scripted Pipeline stages via `/wfapi/describe` with status and duration. |
 | `get_stage_log` | Fetch a single pipeline stage's log via `/execution/node/<id>/wfapi/log`. |
+| `get_pipeline_script` | Return the Jenkinsfile a specific build actually ran. Tries the Replay plugin first (build-pinned), falls back to `config.xml` (job-level — provenance surfaced). Returns SCM coords as a hint for Pipeline-from-SCM jobs. |
 | `get_test_report` | Structured JUnit results from `/testReport/api/json`, with failed cases and head+tail of stack traces. |
 | `get_flaky_candidates` | Rank flaky tests across the latest N completed builds of one job by counting pass↔fail flips. Returns a sorted table of test name, flip count, pass/fail tallies, and last-seen build. |
 | `get_ginkgo_failure_summary` | Parse Ginkgo's `Summarizing N Failure` block and surface the first `[ERROR]` tagged with each spec name. |

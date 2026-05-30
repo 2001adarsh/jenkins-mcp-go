@@ -235,6 +235,16 @@ func run() error {
 	}, deps.GetStageLog)
 
 	mcp.AddTool(srv, &mcp.Tool{
+		Name: "get_pipeline_script",
+		Description: "Return the Jenkinsfile a specific build actually ran. Tries the " +
+			"Replay plugin endpoint first (build-pinned, faithful source); falls back to " +
+			"the job-level config.xml (current Jenkinsfile, may differ from what the build " +
+			"ran — provenance is surfaced in the output). For Pipeline-from-SCM jobs where " +
+			"the Jenkinsfile lives in git, returns a hint with the SCM coordinates so the " +
+			"agent can clone+read it independently.",
+	}, deps.GetPipelineScript)
+
+	mcp.AddTool(srv, &mcp.Tool{
 		Name: "list_nodes",
 		Description: "List all Jenkins agents/nodes with online/offline status, executor counts, " +
 			"labels, and monitor summaries. Use this to diagnose 'why is this build still queued' — " +
