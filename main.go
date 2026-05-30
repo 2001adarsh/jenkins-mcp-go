@@ -231,6 +231,16 @@ func run() error {
 	}, deps.GetFlakyCandidates)
 
 	mcp.AddTool(srv, &mcp.Tool{
+		Name: "get_test_history",
+		Description: "Per-build trend of a single test across the last N completed builds — the " +
+			"follow-up to get_flaky_candidates once a suspect is known. Accepts test_full_name as " +
+			"either className.name or className/name. Renders a per-build timeline (build #, build " +
+			"result, test status, duration, one-line error head) and a summary with PASS/FAIL/SKIP " +
+			"counts and total status flips. Defaults: sample_size=20 (cap 50), include_skipped=false " +
+			"(SKIPPED rows suppressed; set true to surface them in the timeline and flip count).",
+	}, deps.GetTestHistory)
+
+	mcp.AddTool(srv, &mcp.Tool{
 		Name: "get_pipeline_stages",
 		Description: "List Declarative/Scripted Pipeline stages for a build with status and " +
 			"duration via /wfapi/describe. Use this first to find which stage failed before " +

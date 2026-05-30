@@ -34,11 +34,17 @@ func newFlakyDeps(t *testing.T, jobPath string, fixtures map[int64]flakyFixture)
 			return
 		}
 		if rest == "api/json" {
-			listing := flakyJobAPI{}
+			type buildRef struct {
+				Number int64  `json:"number"`
+				Result string `json:"result"`
+			}
+			listing := struct {
+				Builds []buildRef `json:"builds"`
+			}{}
 			// Highest build number first — Jenkins' canonical order.
 			nums := sortedKeysDesc(fixtures)
 			for _, n := range nums {
-				listing.Builds = append(listing.Builds, flakyBuildRef{
+				listing.Builds = append(listing.Builds, buildRef{
 					Number: n,
 					Result: fixtures[n].Result,
 				})
@@ -75,7 +81,7 @@ func newFlakyDeps(t *testing.T, jobPath string, fixtures map[int64]flakyFixture)
 	return Deps{Client: cli}, srv
 }
 
-func sortedKeysDesc(m map[int64]flakyFixture) []int64 {
+func sortedKeysDesc[T any](m map[int64]T) []int64 {
 	out := make([]int64, 0, len(m))
 	for k := range m {
 		out = append(out, k)

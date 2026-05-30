@@ -489,6 +489,46 @@ pkg.refund.RefundFlow                                             3      10     
 Rows are sorted by flips desc, then failures desc, then test name asc
 for stable ordering. The `test` column is rune-truncated at 60 chars.
 
+## `get_test_history`
+
+Per-build trend of a single test across the last N completed builds —
+the natural follow-up to `get_flaky_candidates` once a suspect test is
+known. Answers *"when did this start flipping?"* in one call.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `job_path` | string | yes | — | Slash-separated job path. |
+| `test_full_name` | string | yes | — | Fully-qualified test name. Accepts both `className.name` (e.g. `com.example.FooTest.bar`) and `className/name`. |
+| `sample_size` | integer | no | `20` | Builds to scan. Capped at 50; in-progress builds at the head don't count. |
+| `include_skipped` | bool | no | `false` | When true, `SKIPPED` appears in the timeline and counts toward the flip total. When false, `SKIPPED` rows are suppressed. |
+
+Output: a header, the per-build timeline (newest first), and a summary
+line:
+
+```
+History of com.example.FooTest.bar in svc (20 builds):
+
+  build  result    status       duration  error head
+  -----  --------  -----------  --------  --------------------------
+   #91   SUCCESS   PASS         0.42s
+   #90   FAILURE   FAIL         1.10s     AssertionError: expected ...
+   #89   SUCCESS   PASS         0.38s
+   ...
+
+Summary: 17 PASS, 3 FAIL, 0 SKIP. 4 status flips in window.
+```
+
+Special rows:
+
+- **`(no report)`** — the build had no `/testReport/api/json` (HTTP 404).
+- **`(missing)`** — the build had a report but didn't include this test
+  (added later, renamed, or moved between suites).
+
+Returns a hint instead of the table when the test wasn't seen in *any*
+build in the window. Parallel-fetches the per-build test reports
+(concurrency 6) and shares the build-discovery helper with
+`get_flaky_candidates`.
+
 ## `get_ginkgo_failure_summary`
 
 Parse Ginkgo's `Summarizing N Failure` block and, for each failing spec,
