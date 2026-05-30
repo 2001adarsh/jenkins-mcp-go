@@ -70,6 +70,44 @@ the footer points the caller at `name_filter`. A 403 (token lacks
 `Overall/Read` on `/pluginManager`) degrades to a clear hint rather than an
 error — same shape as `health_check`'s `WARN` plugin row.
 
+## `whoami_can`
+
+Resolve the configured token's effective Read / Build / Cancel / Configure
+permissions on a job. Jenkins doesn't expose a direct "list my permissions"
+endpoint, so the tool infers from a small set of read-only `GET` probes and
+HTTP status codes. Use this up-front before triggering or cancelling a build
+to avoid burning a turn on a 403.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `job_path` | string | yes | — | Slash-separated job (or folder) path. |
+
+Probes:
+
+- **read** — `GET /<job>/api/json`. `200` ⇒ OK; `403` or `404` ⇒ DENIED.
+- **build** — `GET /<job>/build`, falling through to
+  `/<job>/buildWithParameters`. `405` on either ⇒ OK (permission held, just
+  the wrong verb); `403` on both ⇒ DENIED.
+- **cancel** — `GET /<job>/lastBuild/stop`. `405` ⇒ OK; `403` ⇒ DENIED.
+  Surfaces as `N/A (no last build)` when there isn't one to stop.
+- **configure** — `GET /<job>/configure`. `200` ⇒ OK; `403` ⇒ DENIED.
+
+For folders (detected via `_class`), `build` and `cancel` render as
+`N/A (folder)`. Any other response (5xx, transport error) maps to UNKNOWN.
+
+This tool stays read-only even when `JENKINS_MCP_READONLY=false` — every
+probe is a `GET`, no endpoint is ever POSTed to.
+
+Output:
+
+```
+Permissions for alice (Alice) on team/my-job:
+  read       OK
+  build      OK
+  cancel     DENIED
+  configure  DENIED
+```
+
 ## `list_jobs`
 
 Enumerate jobs and folders under `folder_path` (root when empty). Use this
