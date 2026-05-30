@@ -155,6 +155,16 @@ func run() error {
 	}, deps.GetBuildInfo)
 
 	mcp.AddTool(srv, &mcp.Tool{
+		Name: "get_build_environment",
+		Description: "Return three labeled sections for a build: Cause (manual/SCM/" +
+			"upstream/timer — Jenkins' shortDescription verbatim), Parameters (name=value; " +
+			"secret-typed values that Jenkins masks render as (masked)), and Injected Env " +
+			"Vars (EnvInject plugin; degrades to a clear 404 hint when the plugin isn't " +
+			"installed). Optional name_filter (case-insensitive RE2) narrows the env-var " +
+			"section only; cause+parameters always render in full.",
+	}, deps.GetBuildEnvironment)
+
+	mcp.AddTool(srv, &mcp.Tool{
 		Name: "get_scm_context",
 		Description: "Return the per-commit change history for one build: commit id, author, " +
 			"timestamp, message subject, and each commit's touched paths with a single-letter edit " +

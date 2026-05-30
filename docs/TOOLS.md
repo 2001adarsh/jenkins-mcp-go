@@ -326,6 +326,55 @@ set. The Jenkins `tree` selector is explicit so the response stays small.
 | `job_path` | string | yes | — | Slash-separated job path. |
 | `build_number` | integer | no | `0` | Build number. |
 
+## `get_build_environment`
+
+Return three labelled sections — `Cause`, `Parameters`, and `Injected
+Env Vars` — for a single build. Common cause of failures is a wrong env
+var or unexpected upstream trigger; `get_build_info` shows parameters
+but not env or trigger reason. This is the deep tool.
+
+| Field | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `job_path` | string | yes | — | Slash-separated job path. |
+| `build_number` | integer | no | `0` | Build to inspect. `0` = `lastBuild`. |
+| `name_filter` | string | no | — | Case-insensitive RE2 regex applied to injected env var names only. Cause and parameters always render in full. |
+
+Endpoints:
+
+- **Cause + Parameters** — `/<job>/<build>/api/json` with an `actions[…]`
+  selector. Cause is rendered verbatim from Jenkins' `shortDescription`
+  (e.g. *"Started by user alice"*, *"Started by upstream project foo
+  build 42"*, *"Started by an SCM change"*, *"Started by timer"*).
+- **Injected env vars** — `/<job>/<build>/injectedEnvVars/api/json`,
+  provided by the **EnvInject plugin**. When the endpoint returns 404,
+  this section degrades to a one-line hint that the plugin isn't
+  installed; the other two sections still render.
+
+Output:
+
+```
+Cause:
+  Started by user Alice Example
+
+Parameters:
+  BRANCH=main
+  RELEASE_VERSION=1.2.3
+  API_TOKEN=(masked)
+
+Injected Env Vars (122 total, 8 after filter):
+  GIT_BRANCH=main
+  GIT_COMMIT=abc1234
+  ...
+```
+
+Notes:
+
+- Secret-typed parameter values that Jenkins masks server-side render
+  as `(masked)`. No unmasking is attempted.
+- Empty Cause / Parameters sections render `(none)` rather than being
+  omitted, so the section structure is stable.
+- Env vars are sorted alphabetically for deterministic output.
+
 ## `get_pipeline_stages`
 
 List Declarative/Scripted Pipeline stages for a build via `/wfapi/describe`.

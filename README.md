@@ -68,6 +68,7 @@ console log without re-downloading it on every question.
 | `get_console_log_path` | Force-cache the full log for a completed build and return its on-disk path so the agent can `Read`/`Grep`/`Bash` it natively. |
 | `search_console_log` | RE2 regex search over the console log with line-number-aware context windows. |
 | `get_build_info` | Pretty-printed build summary: result, duration, parameters, change set. |
+| `get_build_environment` | Three sections for a build: Cause (trigger reason verbatim), Parameters (masked secrets surfaced as `(masked)`), and Injected Env Vars via EnvInject. Optional RE2 `name_filter` narrows the env-var section. Degrades on EnvInject 404. |
 | `get_scm_context` | Per-commit history for one build: commit id, author, timestamp, message subject, and each commit's touched paths with `A`/`M`/`D` edit codes. Pipeline change sets are flattened with per-set headers. Optional RE2 `path_filter`. |
 | `last_green_build` | Report the most recent successful build of a job. Returns number, finish time (UTC), and URL — the start point for bisect-from-green. |
 | `changes_since_last_green` | Union the commits across every completed build since the job's last green. Walks `previousCompletedBuild`, dedupes by `commitId`, supports `path_filter` and `max_commits`. Surfaces 'all green' and wide-window footers. |
